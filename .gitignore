@@ -1,0 +1,7 @@
+.env
+.pf/
+__pycache__/
+*.pyc
+._*
+.DS_Store
+*.blend1
