@@ -33,7 +33,7 @@ DEFAULTS = {
                "water": [0.02, 0.07, 0.07], "sea": [0.01, 0.05, 0.075], "wind_bearing": 240},
     "infill": {"density": "auto", "lot_m": [9, 16], "floors": [1, 3]},
     "far": {"urban": 0.65, "trees": 0.5},
-    "life": {"vehicles": 0.6, "people": 0.5, "street_lamps": True},
+    "life": {"vehicles": 0.6, "people": 0.5, "street_lamps": True, "helicopter": 1, "heli_bearing": 140, "heli_radius": 0, "heli_height": 0},
     "render": {"w": 1920, "h": 1080, "samples": 256, "noise": 0.012, "preview_pct": 50, "preview_samples": 64},
     "film": {"fps": 24},
 }

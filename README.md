@@ -10,8 +10,8 @@ with the photo by numbers and by eye, fix the worst gap, render again.
 From one scene description you get:
 
 - **Stills** in Blender Cycles, matched to your reference photo
-- **A film** of any length: day, sunset and night, with traffic, people and trains moving
-- **An interactive Three.js page** (one HTML file) with orbit controls and a time-of-day slider
+- **A film** of any length: day, sunset and night, with traffic, people, trains and a helicopter moving
+- **An interactive Three.js page** (one HTML file) with orbit controls, a time-of-day slider and the same moving life
 
 It was born from rebuilding the Lotus Tower in Colombo, which ships as the worked example.
 
@@ -43,6 +43,7 @@ the steps below.
 |---|---|---|
 | Find the pin | `pf locate "Lotus Tower Colombo"` | Name, maps link or `lat,lon` to coordinates |
 | Start a project | `pf init P --lat .. --lon .. --radius 900 --photos DIR` | `place.json`, `.env`, `landmark.py` |
+| No photos? | `pf photos P` | Licensed photos near the pin and by name (Wikimedia Commons, Wikidata, Openverse), with credits. Opt-in `--browser` adds a web image search for references |
 | Real map | `pf map P` | Streets, footprints, heights, water, coast, railways, parks, trees inside the radius |
 | Read the photos | `pf refs P` | Contact sheet and a pixel grid on the target photo |
 | Match the camera | `pf camera P --horizon .. --base-row .. --top-row ..` | Camera distance, height, lens and compass from one photo |
@@ -83,13 +84,18 @@ pf web lotus            # open lotus/web/index.html
 - Beyond the detailed radius the city is generated, not mapped building by building.
 - The landmark is modelled by Claude from your photos. Its quality depends on the photos (close-ups matter most)
   and on how many loops you let it run.
-- The Three.js page has no moving traffic yet.
+- Traffic follows lanes without junction rules; people only walk.
 
 ## Credits and licences
 
 - Code: MIT (see `LICENSE`).
 - Map data: (c) [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, ODbL. Credit it wherever you
   show a result.
-- Default models: Quaternius (via Poly Pizza) and Grab3D, CC0. Ground textures: Poly Haven, CC0. The list and
+- Default models (cars, van, bus, people, train, helicopter): Quaternius (via Poly Pizza) and Grab3D, CC0. Ground textures: Poly Haven, CC0. The list and
   every licence: `assets.default.json`.
 - Your reference photos stay yours (or their photographers'). They are references, never published by this tool.
+- Photos found by `pf photos`: the licensed ones come with author and licence in `refs/CREDITS.md`. The opt-in web
+  image search (`--browser`) reads a public results page with [CloakBrowser](https://github.com/CloakHQ/CloakBrowser)
+  (installed on first use, version 0.6.3, free build; your own Chrome if that fails): read-only, without login, a
+  few searches at most, and it stops at any verification wall. What it finds has no known licence and is for
+  reference only.

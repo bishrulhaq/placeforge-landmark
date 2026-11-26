@@ -84,7 +84,7 @@ def main():
     if arg("life", "1") == "1":
         try:
             import pf_life
-            life = pf_life.build(mp, rng)
+            life = pf_life.build(mp, rng, H)
         except Exception as e:
             pf.log("life skipped:", repr(e))
     pf.log("built in %.1f s" % (time.time() - t0))

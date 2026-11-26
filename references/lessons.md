@@ -14,5 +14,7 @@ improves from one use to the next.
 - Trees close up need leaf cards; clumps alone read as green boulders.
 - Night: one saturated LED colour at a time, low emission strengths, no haze slab, no cloud deck.
 - Film: birds without wing motion and a frozen helicopter read as fake and were cut. Star-streak flares were cut.
+- People must not be decimated: at 420 triangles a walker turned to shreds. Vehicles survive 1,100.
+- A rotor's hub is not its bounding-box centre (blades make the box lopsided): use the hub material's faces.
 - Viewer: 58 M triangles a frame came from hundreds of downloaded vehicles in three passes; distance culling and
   keeping small things out of reflections fixed the frame rate.

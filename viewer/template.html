@@ -376,9 +376,89 @@ function buildLamps(L) {
   const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(heads, 3));
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const cx = cv.getContext('2d'), gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
   gr.addColorStop(0, 'rgba(255,225,170,1)'); gr.addColorStop(0.25, 'rgba(255,190,110,.55)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, 64, 64);
-  const pm = new THREE.PointsMaterial({ map: new THREE.CanvasTexture(cv), size: 9, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  const pm = new THREE.PointsMaterial({ map: new THREE.CanvasTexture(cv), size: 3.2, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
   const pts = new THREE.Points(pg, pm); pts.frustumCulled = false; ZUP.add(pts);
   nightHooks.push(nf => { pm.opacity = nf; pts.visible = nf > 0.02; });
+}
+
+// ------------------------------------------------------------------ life: the same traffic, walkers, trains and helicopter as the film
+const tick = [];
+function soupGeo(buf, c) {
+  const ib = new THREE.InterleavedBuffer(new Float32Array(buf, c.off, c.n * 9), 9), g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.InterleavedBufferAttribute(ib, 3, 0));
+  g.setAttribute('normal', new THREE.InterleavedBufferAttribute(ib, 3, 3));
+  g.setAttribute('color', new THREE.InterleavedBufferAttribute(ib, 3, 6));
+  return g;
+}
+function mkPath(f) { const n = f.length / 2, cum = new Float32Array(n); for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(f[i * 2] - f[i * 2 - 2], f[i * 2 + 1] - f[i * 2 - 1]); return { f, cum, n, len: cum[n - 1] }; }
+function pathAt(P, s, o) {
+  let lo = 1, hi = P.n - 1;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (P.cum[m] < s) lo = m + 1; else hi = m; }
+  const i = lo, x0 = P.f[i * 2 - 2], y0 = P.f[i * 2 - 1], x1 = P.f[i * 2], y1 = P.f[i * 2 + 1], d = P.cum[i] - P.cum[i - 1] || 1, t = Math.min(Math.max((s - P.cum[i - 1]) / d, 0), 1);
+  o[0] = x0 + (x1 - x0) * t; o[1] = y0 + (y1 - y0) * t; o[2] = Math.atan2(y1 - y0, x1 - x0);
+}
+function buildLife(buf) {
+  const mod = (a, n) => ((a % n) + n) % n;
+  const Lf = META.life, o = [0, 0, 0], m4 = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+  const paint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.15 });
+  const cloth = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+  const inst = (geo, mat, n) => { const im = new THREE.InstancedMesh(geo, mat, n); im.castShadow = im.receiveShadow = true; im.frustumCulled = false; ZUP.add(im); return im; };
+  const place = (im, j, x, y, z, a) => { m4.makeRotationZ(a); m4.setPosition(x, y, z); im.setMatrixAt(j, m4); };
+  const geos = Lf.protos.map(p => soupGeo(buf, p.soup));
+  const lanes = Lf.lanes.map(mkPath), paths = Lf.paths.map(mkPath), tracks = Lf.tracks.map(mkPath);
+  // moving vehicles, grouped by model
+  const C = Lf.cars, nc = C.length / 6, byP = {};
+  for (let i = 0; i < nc; i++) (byP[C[i * 6]] ||= []).push(i);
+  const fleets = Object.entries(byP).map(([pi, ids]) => ({ ids, im: inst(geos[pi], paint, ids.length) }));
+  const heads = new Float32Array(nc * 3), hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.BufferAttribute(heads, 3));
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const cx = cv.getContext('2d'), gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,245,220,1)'); gr.addColorStop(0.3, 'rgba(255,235,190,.5)'); gr.addColorStop(1, 'rgba(255,230,180,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, 64, 64);
+  const hm = new THREE.PointsMaterial({ map: new THREE.CanvasTexture(cv), size: 1.3, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  const hp = new THREE.Points(hg, hm); hp.frustumCulled = false; ZUP.add(hp);
+  nightHooks.push(nf => { hm.opacity = nf; hp.visible = nf > 0.02; });
+  tick.push(t => { for (const fl of fleets) { fl.ids.forEach((i, j) => { const P = lanes[C[i * 6 + 1]], off = C[i * 6 + 4];
+      pathAt(P, mod(C[i * 6 + 2] + C[i * 6 + 3] * t, P.len), o);
+      const x = o[0] - Math.sin(o[2]) * off, y = o[1] + Math.cos(o[2]) * off; place(fl.im, j, x, y, C[i * 6 + 5], o[2]);
+      heads[i * 3] = x + Math.cos(o[2]) * 2.1; heads[i * 3 + 1] = y + Math.sin(o[2]) * 2.1; heads[i * 3 + 2] = 0.75; }); fl.im.instanceMatrix.needsUpdate = true; }
+    if (hp.visible) hg.attributes.position.needsUpdate = true; });
+  // parked cars
+  const K = Lf.parked, byK = {};
+  for (let i = 0; i < K.length / 4; i++) (byK[K[i * 4]] ||= []).push(i);
+  for (const [pi, ids] of Object.entries(byK)) { const im = inst(geos[pi], paint, ids.length); ids.forEach((i, j) => place(im, j, K[i * 4 + 1], K[i * 4 + 2], 0.04, K[i * 4 + 3])); }
+  // walkers: one instanced mesh per person model and pose; a walker shows in the pose its step is at
+  const Wk = Lf.walkers, nw = Wk.length / 6, NP = Lf.poses, byM = {};
+  for (let i = 0; i < nw; i++) (byM[Wk[i * 6]] ||= []).push(i);
+  const crowds = Object.entries(byM).map(([mi, ids]) => ({ ids, ims: Lf.people[mi].map(c => inst(soupGeo(buf, c), cloth, ids.length)) }));
+  tick.push(t => { for (const cr of crowds) { for (const im of cr.ims) im.count = 0;
+    cr.ids.forEach((i) => { const P = paths[Wk[i * 6 + 1]], v = Wk[i * 6 + 3], off = Wk[i * 6 + 4];
+      const s = mod(Wk[i * 6 + 2] + Math.abs(v) * t, P.len); pathAt(P, v > 0 ? s : P.len - s, o);
+      const k = mod(Math.floor((t * 1.9 + Wk[i * 6 + 5]) * NP), NP);
+      const im = cr.ims[k];           // each pose mesh draws only the walkers in that pose right now
+      place(im, im.count++, o[0] - Math.sin(o[2]) * off, o[1] + Math.cos(o[2]) * off, 0.16, v > 0 ? o[2] : o[2] + Math.PI); });
+    for (const im of cr.ims) im.instanceMatrix.needsUpdate = true; } });
+  // trains
+  const Tn = Lf.trains, byT = {};
+  for (let i = 0; i < Tn.length / 4; i++) (byT[Tn[i * 4]] ||= []).push(i);
+  const rakes = Object.entries(byT).map(([pi, ids]) => ({ ids, im: inst(geos[pi], paint, ids.length) }));
+  tick.push(t => { for (const rk of rakes) { rk.ids.forEach((i, j) => { const P = tracks[Tn[i * 4 + 1]];
+      pathAt(P, mod(Tn[i * 4 + 2] + Tn[i * 4 + 3] * t, P.len), o); place(rk.im, j, o[0], o[1], 0.30, o[2]); }); rk.im.instanceMatrix.needsUpdate = true; } });
+  // helicopter: a banked circle round the landmark, each rotor turning about its own hub
+  const Hh = Lf.heli;
+  if (Hh) {
+    const root = new THREE.Group(), mk = (c) => { const m = new THREE.Mesh(soupGeo(buf, c), paint); m.castShadow = true; root.add(m); return m; };
+    mk(Hh.soups[0]); const main = mk(Hh.soups[1]), tail = mk(Hh.soups[2]);
+    main.position.fromArray(Hh.main_hub); tail.position.fromArray(Hh.tail_hub);
+    root.rotation.order = 'ZYX';
+    ZUP.add(root);
+    window.__heli = root;
+    tick.push(t => { const a = Hh.a0 - Hh.w * t;
+      root.position.set(Hh.cx + Hh.r * Math.sin(a), Hh.cy + Hh.r * Math.cos(a), Hh.z + 2.5 * Math.sin(t * 0.6));
+      root.rotation.set(THREE.MathUtils.degToRad(Hh.bank), THREE.MathUtils.degToRad(-3), -a);
+      main.rotation.z = t * 6.2832 * Hh.rps;
+      tail.rotation.set(0, 0, 0); tail.rotation['xyz'[Hh.tail_axis]] = t * 6.2832 * Hh.tail_rps; });
+  }
+  return { cars: nc, parked: K.length / 4, walkers: nw, trains: Tn.length / 4, heli: !!Hh };
 }
 
 // ------------------------------------------------------------------ views
@@ -406,6 +486,7 @@ const D = await load();
 buildGround();
 const stats = { cityVerts: buildCity(D), trees: buildTrees(D.trees), tris: buildMeshes(D.buf) };
 buildLamps(D.lamps);
+if (META.life) stats.life = buildLife(D.buf);
 nightHooks.push(nf => { for (const [m, c] of waterMats) m.color.copy(c).multiplyScalar(0.1 + 0.9 * (1 - nf)); });
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -422,10 +503,12 @@ setSun(+sunIn.value);
 setView(VIEWS[hash[0]] ? hash[0] : order[0]);
 if (hv.cam) { const c = hv.cam.split(',').map(Number); camera.position.copy(W(c[0], c[1], c[2])); controls.target.copy(W(c[3], c[4], c[5])); controls.update(); }
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
+const T0 = +(hv.time || 0);            // #view&time=12 starts the life 12 s in (testing)
 const clock = new THREE.Clock();
 let frames = 0;
 renderer.setAnimationLoop(() => {
   timeU.value = clock.getElapsedTime();
+  for (const f of tick) f(timeU.value + T0);
   controls.update();
   sun.target.position.copy(controls.target);
   sun.position.copy(controls.target).addScaledVector(sunDirW, 4000);

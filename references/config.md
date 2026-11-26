@@ -38,5 +38,6 @@ Positions are metres east, north, up from the pin. Bearings are compass degrees 
 | `infill.lot_m`, `infill.floors` | Lot size range and floors of generated buildings |
 | `far.urban`, `far.trees` | Density of the generated far ring |
 | `life.vehicles`, `life.people` | 0 to 1. `life.street_lamps`: true or false |
+| `life.helicopter` | 1 or 0. `life.heli_radius`, `life.heli_height` in metres (0 = from the landmark's height), `life.heli_bearing`: where on its circle it is at time 0 |
 | `render.w`, `render.h`, `render.samples`, `render.preview_pct`, `render.preview_samples` | Stills |
 | `film.fps`, `film.w`, `film.h`, `film.samples` | Films |

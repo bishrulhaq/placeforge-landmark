@@ -5,6 +5,8 @@
   pf locate "<name | maps link | lat,lon>"  find the pin
   pf init <dir> --name N --lat A --lon B --radius M [--photos DIR] [--target FILE] [--height M] [--far M]
   pf map <project> [--api] [--reuse]        real map data inside the radius -> map/osm.json + map/preview.png
+  pf photos <project> [--query Q] [--max N] [--browser]     find reference photos when the user gave none:
+                                            licensed sources first; --browser adds a web image search (opt-in)
   pf refs <project>                         contact sheet of the photos + the target with a pixel grid (for measuring)
   pf sun <project> --when "2021-03-14 15:30" --tz 5.5 [--write day|sunset]
   pf camera <project> --horizon ROW --base-row ROW --top-row ROW --height M --col COL
@@ -184,7 +186,7 @@ def cmd_init(args):
         s, t = os.path.join(ROOT, src), os.path.join(d, dst)
         if os.path.exists(s) and not os.path.exists(t):
             shutil.copy2(s, t)
-    open(os.path.join(d, ".gitignore"), "w").write(".env\n.pf/\nrenders/\nfilm/frames/\nmap/osm*_raw.json\nassets/models/\nassets/tex/\n__pycache__/\n._*\n.DS_Store\n")
+    open(os.path.join(d, ".gitignore"), "w").write(".env\n.pf/\nrefs/web_*\nrenders/\nfilm/frames/\nmap/osm*_raw.json\nassets/models/\nassets/tex/\n__pycache__/\n._*\n.DS_Store\n")
     open(os.path.join(d, "renders", "LOOPS.md"), "w").write("# %s: perfection loop log\n\n| loop | diff | what changed | gap found next |\n|---|---|---|---|\n" % name)
     print("project: %s (%d photos copied)\nnext: pf map %s" % (d, n, d))
 
@@ -694,12 +696,17 @@ def cmd_gpu(args):
     sys.exit(gpu(proj, *args).returncode)
 
 
+def cmd_photos(args):
+    proj = project(args)
+    sys.exit(subprocess.run([sys.executable, os.path.join(TOOLS, "photos.py"), proj] + args).returncode)
+
+
 def cmd_map(args):
     proj = project(args)
     sys.exit(subprocess.run([sys.executable, os.path.join(TOOLS, "osm_fetch.py"), proj] + args).returncode)
 
 
-CMDS = {"doctor": cmd_doctor, "locate": cmd_locate, "init": cmd_init, "map": cmd_map, "refs": cmd_refs, "sun": cmd_sun,
+CMDS = {"photos": cmd_photos, "doctor": cmd_doctor, "locate": cmd_locate, "init": cmd_init, "map": cmd_map, "refs": cmd_refs, "sun": cmd_sun,
         "camera": cmd_camera, "assets": cmd_assets, "build": cmd_build, "render": cmd_render, "compare": cmd_compare,
         "log": cmd_log, "film": cmd_film, "web": cmd_web, "shot": cmd_shot, "gpu": cmd_gpu}
 

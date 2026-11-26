@@ -21,7 +21,7 @@ What is generated and what is not:
 | Streets, building footprints and heights, water, coast, railways, parks, mapped trees | OpenStreetMap inside the radius, as mapped (`pf map`) |
 | Unmapped streets, and the land out to the horizon | The generator, by the region's rules in `place.json` |
 | The landmark itself | **You model it** in `P/landmark.py` from the photos. This is the craft; the loop is how it gets good |
-| Cars, buses, people, trains | Downloaded CC0 models (`pf assets`). Never hand-built boxes: no model, no object |
+| Cars, vans, buses, people, trains, a helicopter | Downloaded CC0 models (`pf assets`). Never hand-built boxes: no model, no object. In the film and in the Three.js page they move the same way |
 
 ## Rules
 
@@ -36,7 +36,8 @@ What is generated and what is not:
    before a guessed one. Look up what the local thing really looks like (buses, trains, roofs, street lamps).
 6. **Say what is true.** Map data is (c) OpenStreetMap contributors (ODbL): credit it wherever a result is shown.
    Record every downloaded asset's licence in `P/assets/assets.json`; credit CC-BY authors. Do not publish other
-   people's photos; they are references only.
+   people's photos; they are references only. Photos the skill found under a stated licence (`refs/cc_*`) may be
+   shown with the credit in `refs/CREDITS.md`; photos from a web image search (`refs/web_*`) never.
 7. **Never claim a match you did not check.** Every "it matches" comes with a `pf compare` number and the
    side-by-side you looked at.
 
@@ -46,6 +47,8 @@ Ask only for what is missing. Use one round of questions.
 
 - **Photos** of the place: a folder. One of them is the **target** (the view the still must match): wide, sharp,
   level horizon. Close-ups of the landmark matter more than extra wide shots. Minimum: 1 wide + 2 close-ups.
+  If they have none, or too few, the skill can look for them (see "No photos" below): say so and ask if they
+  also allow a web image search.
 - **Where it is**: a name, a Google Maps or OpenStreetMap link, or `lat,lon`. Check with `pf locate`.
 - **Radius** in metres of full detail round the pin. Guide: 300 to 500 for a building and its streets, 800 to
   1,000 for a landmark in its district (default 800), 1,500+ only if the photo's foreground needs it.
@@ -67,6 +70,30 @@ pf init P --name "Lotus Tower" --lat 6.92703 --lon 79.85828 --radius 900 --heigh
 `pf init` makes `P/place.json` (the whole scene description), `P/.env` (compute and keys), `P/landmark.py` (a
 template), `P/refs/`, `P/assets/assets.json`, `P/renders/LOOPS.md`. Tell the user to open `P/.env` if they chose
 Vast or SSH. Every key of `place.json`: [references/config.md](references/config.md).
+
+### No photos, or too few
+
+```bash
+pf photos P --query "Lotus Tower Colombo"      # licensed sources: Wikimedia Commons, Wikidata, Openverse -> refs/cc_*.jpg
+pf photos P --browser                          # only if the user agreed: + a public image-search page -> refs/web_*.jpg
+pf refs P                                      # contact sheet: look at every photo
+pf photos P --drop cc_04,web_12                # set aside what is not the place (paintings, interiors, other subjects)
+```
+
+- **Tier 1** is always allowed. Each photo's licence and author go to `refs/_sources.json` and `refs/CREDITS.md`;
+  these may be shown with that credit. Wikidata facts (height, year) land in `refs/_facts.json`.
+- **Tier 2** needs the user's yes (`--browser`, or `PF_PHOTO_BROWSER=1` in `P/.env`). It reads a public image-search
+  results page in CloakBrowser, which the command installs on first use (about 550 MB in all, outside the project;
+  pinned to 0.6.3, the version whose free build needs no licence key; tell the user before the first run). If it
+  cannot install or start, the Chrome on their machine is used instead, with a fresh empty profile. Its rules are fixed: read-only, public
+  pages, no login, one page at a time, 10 s between searches, three searches and 30 images at most, and on a
+  verification wall or an empty page it stops: no retry, no other engine. Never work round a block.
+- `web_*` photos have **no known licence**. They are references only: never put them in a film, a page, a
+  thumbnail, a repository or any message that leaves the machine. They are git-ignored.
+- Search results are noisy. Look at the contact sheet, drop what is not the place, then choose the target yourself
+  (wide, level, daylight) and write it to `place.json` `refs.target`. Tell the user what was found, from where, and
+  which photo you chose.
+- Still short of one wide view and two close-ups: ask the user. Do not model a landmark from one photo.
 
 ## 2. Dig, then look
 
@@ -126,7 +153,7 @@ pf web P && pf shot P hero  # a quick look in the Three.js viewer: shapes, place
 This is the heart of the skill. One loop:
 
 ```bash
-pf assets P                                   # once: CC0 vehicles, people, ground textures (add --remote on a rented machine)
+pf assets P                                   # once: CC0 vehicles, people, helicopter, ground textures (--remote on a rented machine)
 pf render P --name loop01 --view photo,close  # previews (half size, 64 samples)
 pf compare P loop01_photo                     # numbers + _sbs.jpg, _blend.jpg, _diff.jpg
 pf log P loop01 "what changed" "the worst gap now"
@@ -180,9 +207,12 @@ pf web P                      # -> P/web/index.html, one self-contained file
 pf shot P photo --t 40        # headless Chrome screenshot (view name, sun elevation); also prints the frame rate
 ```
 
-The page shows the same city and landmark with orbit controls, view buttons and a time-of-day slider. It is a
-real-time look, not Cycles. Shader detail made with nodes does not travel: give such materials an average colour
-with `pf.viewer_color(...)` (see the landmark reference). Moving traffic is in the film only, for now.
+The page shows the same city and landmark with orbit controls, view buttons and a time-of-day slider, and the same
+life as the film: traffic keeping to its side of the road, parked cars, people walking, trains, the helicopter
+circling with both rotors turning, head lamps at night. It is a real-time look, not Cycles. Shader detail made
+with nodes does not travel: give such materials an average colour with `pf.viewer_color(...)` (see the landmark
+reference). Vehicle models are thinned to about 1,100 triangles for the page; people are kept whole (a thinned
+figure falls apart).
 
 ## 9. Where renders run
 
@@ -204,6 +234,7 @@ Traps and their fixes (slow hosts, OptiX failures, killed jobs, transfers): [ref
 - Flyovers and tunnels are drawn at grade; only bridges over water get a deck.
 - The far ring is generated, not mapped building by building.
 - A camera with a tilted horizon or strong lens distortion will not match exactly.
-- The Three.js page has no moving traffic or people yet.
+- Traffic follows lanes at one speed per lane: no junction rules, no overtaking. People walk; they do not stand, sit or cross.
+- One helicopter on a circle (`life.helicopter`, `life.heli_radius`, `life.heli_height`, `life.heli_bearing`); no birds or aircraft (frozen wings read as fake).
 - Tested with Blender 5.2 on macOS (build, export, viewer). The rented-GPU path is ported from the scripts that
   rendered the Lotus Tower; check the first preview before queuing a film.

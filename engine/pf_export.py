@@ -83,7 +83,7 @@ def export(mp, B, trees, H, life=None):
     dg = bpy.context.evaluated_depsgraph_get()
     meshes = []
     for o in bpy.context.scene.objects:
-        if o.type != "MESH" or o.name in SKIP or o.name.startswith(("ll", "life_")) or not o.visible_get():
+        if o.type != "MESH" or o.name in SKIP or o.name.startswith(("ll", "life_", "pf_tmp")) or not o.visible_get():
             continue
         if any(md.type == "NODES" for md in o.modifiers):
             continue
@@ -109,6 +109,22 @@ def export(mp, B, trees, H, life=None):
             buf.extend(a.tobytes())
         meshes.append({"name": o.name, "groups": groups})
         o.evaluated_get(dg).to_mesh_clear()
+    lf = None
+    if life:
+        lf = life.export()
+
+        def blob(a):
+            off = len(buf)
+            buf.extend(a.tobytes())
+            return {"off": off, "n": len(a) // 9}
+
+        for p in lf["protos"]:
+            p["soup"] = blob(p["soup"])
+        lf["people"] = [[blob(a) for a in poses] for poses in lf["people"]]
+        if lf["heli"]:
+            lf["heli"]["soups"] = [blob(a) for a in lf["heli"]["soups"]]
+        for k in ("cars", "parked", "walkers", "trains"):
+            lf[k] = [round(float(v), 3) for v in lf[k]]
     pose = cam.photo_pose()
     meta = {"name": cfg("name"), "radius": mp.R, "far": mp.FR, "height": H, "floor": cfg("region.floor_m", 3.2),
             "attribution": "Map data (c) OpenStreetMap contributors", "views": cam.views(mp, H),
@@ -116,7 +132,7 @@ def export(mp, B, trees, H, life=None):
             "sun": {"elevation": cfg("time.day.sun_elevation"), "bearing": cfg("time.day.sun_bearing"),
                     "sunset_bearing": cfg("time.sunset.sun_bearing")},
             "water": cfg("region.water"), "sea": cfg("region.sea"), "chunks": chunks, "meshes": meshes,
-            "tree_kinds": ["broad", "round", "tall", "palm", "conifer"], "life": life.export() if life and hasattr(life, "export") else None}
+            "tree_kinds": ["broad", "round", "tall", "palm", "conifer"], "life": lf}
     json.dump(meta, open(os.path.join(out, "scene.json"), "w"), separators=(",", ":"))
     with gzip.open(os.path.join(out, "scene.bin.gz"), "wb", 6) as f:
         f.write(bytes(buf))
