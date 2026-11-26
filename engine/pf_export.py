@@ -127,7 +127,7 @@ def export(mp, B, trees, H, life=None):
             lf[k] = [round(float(v), 3) for v in lf[k]]
     pose = cam.photo_pose()
     meta = {"name": cfg("name"), "radius": mp.R, "far": mp.FR, "height": H, "floor": cfg("region.floor_m", 3.2),
-            "attribution": "Map data (c) OpenStreetMap contributors", "views": cam.views(mp, H),
+            "attribution": "Map data (c) OpenStreetMap contributors", "links": cfg("web.links") or None, "views": cam.views(mp, H),
             "photo": {"from": list(pose[0]), "bearing": pose[1], "lens": pose[2]} if pose else None,
             "sun": {"elevation": cfg("time.day.sun_elevation"), "bearing": cfg("time.day.sun_bearing"),
                     "sunset_bearing": cfg("time.sunset.sun_bearing")},

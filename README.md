@@ -13,7 +13,16 @@ From one scene description you get:
 - **A film** of any length: day, sunset and night, with traffic, people, trains and a helicopter moving
 - **An interactive Three.js page** (one HTML file) with orbit controls, a time-of-day slider and the same moving life
 
-It was born from rebuilding the Lotus Tower in Colombo, which ships as the worked example.
+It was born from rebuilding the Lotus Tower in Colombo, which ships as the worked example:
+[examples/lotus-tower](examples/lotus-tower) (stills, a 50 second film, the web page).
+
+[![Lotus Tower, Colombo, rebuilt in 3D](examples/lotus-tower/media/preview.gif)](examples/lotus-tower)
+
+- **Live 3D demo:** [bishrulhaq.com/demos/lotus-tower-3d.html](https://bishrulhaq.com/demos/lotus-tower-3d.html) : the Lotus Tower in your browser. Orbit it,
+  follow the bus, the train or the helicopter, drag the time from noon to night. (This is the hand-tuned viewer
+  from the original Lotus Tower project; `pf web` builds a plainer page of the same kind for any place.)
+- **Film:** [50 seconds, day, sunset and night](examples/lotus-tower/media/lotus_tower_film.mp4)
+- **Read more:** [Rebuild Any Landmark in 3D: Photos, a Map Pin, and the Loop That Makes It Real](https://bishrulhaq.com/posts/rebuild-any-landmark-in-3d)
 
 ## What you need
 
@@ -85,6 +94,8 @@ pf web lotus            # open lotus/web/index.html
 - The landmark is modelled by Claude from your photos. Its quality depends on the photos (close-ups matter most)
   and on how many loops you let it run.
 - Traffic follows lanes without junction rules; people only walk.
+- The page `pf web` builds is plainer than the Lotus Tower live demo: no cloud layer, no mirror reflections on the
+  water, no follow buttons yet.
 
 ## Credits and licences
 

@@ -20,6 +20,8 @@
   label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
   input[type=range] { flex: 1; accent-color: var(--accent); }
   #help { color: var(--muted); margin-top: 8px; font-size: 12px; }
+  a.lnk { color: var(--ink); text-decoration: none; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 9px; background: rgba(224,69,123,.22); }
+  a.lnk:hover { background: rgba(224,69,123,.4); }
   #load { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1116; z-index: 5; font-size: 14px; color: var(--muted); }
   #hide { position: absolute; right: 8px; top: 8px; padding: 2px 7px; }
   #ui.min > :not(h1):not(#hide) { display: none; }
@@ -44,6 +46,7 @@
   <div class="row" id="views"></div>
   <label>Time <input id="sun" type="range" min="-12" max="80" value="45"></label>
   <div id="help">Drag to orbit · scroll to zoom · right-drag to pan</div>
+  <div class="row" id="links"></div>
 </div>
 <div id="credit"></div>
 <script type="module">
@@ -475,6 +478,7 @@ function setView(name) {
 }
 const order = ['photo', 'hero', 'wide', 'close', 'street', 'top'].filter(k => VIEWS[k]).concat(Object.keys(VIEWS).filter(k => !['photo', 'hero', 'wide', 'close', 'street', 'top'].includes(k)));
 for (const k of order) { const b = document.createElement('button'); b.textContent = k.replace(/_/g, ' '); b.dataset.view = k; b.onclick = () => setView(k); document.getElementById('views').appendChild(b); }
+for (const [label, href] of Object.entries(META.links || {})) { const a = document.createElement('a'); a.className = 'lnk'; a.textContent = label; a.href = href; a.target = '_blank'; a.rel = 'noopener'; document.getElementById('links').appendChild(a); }
 document.getElementById('hide').onclick = () => document.getElementById('ui').classList.toggle('min');
 const sunIn = document.getElementById('sun');
 sunIn.max = Math.max(20, Math.round(META.sun.elevation));
