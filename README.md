@@ -1,28 +1,94 @@
-# placeforge-landmark
+<h1 align="center">placeforge-landmark</h1>
 
-**Rebuild a real place in 3D from photos, a map pin and a radius.**
+<p align="center">
+  <b>Rebuild a real place in 3D from photos, a map pin and a radius.</b><br>
+  A skill for <a href="https://claude.com/claude-code">Claude Code</a>. Blender stills, a film and an interactive Three.js page, all from one scene description.
+</p>
 
-placeforge-landmark is a skill for [Claude Code](https://claude.com/claude-code). You give it reference photos of a place,
-where it is on the map and how many metres around it you want. It builds the place in Blender on real
-OpenStreetMap data, models the landmark from your photos, and then improves the result in a loop: render, compare
-with the photo by numbers and by eye, fix the worst gap, render again.
+<p align="center">
+  <a href="https://bishrulhaq.com/demos/lotus-tower-3d.html"><b>Live 3D demo</b></a>
+  &nbsp;·&nbsp;
+  <a href="examples/lotus-tower/media/lotus_tower_film.mp4"><b>Watch the film</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://bishrulhaq.com/posts/rebuild-any-landmark-in-3d"><b>Read the article</b></a>
+  &nbsp;·&nbsp;
+  <a href="examples/lotus-tower"><b>Lotus Tower example</b></a>
+</p>
 
-From one scene description you get:
+<p align="center">
+  <img src="https://img.shields.io/badge/licence-MIT-2ea44f" alt="MIT licence">
+  <img src="https://img.shields.io/badge/Claude%20Code-skill-d97757" alt="Claude Code skill">
+  <img src="https://img.shields.io/badge/Blender-Cycles-ea7600" alt="Blender Cycles">
+  <img src="https://img.shields.io/badge/Three.js-viewer-000000" alt="Three.js viewer">
+  <img src="https://img.shields.io/badge/map%20data-OpenStreetMap-7ebc6f" alt="OpenStreetMap data">
+</p>
 
-- **Stills** in Blender Cycles, matched to your reference photo
-- **A film** of any length: day, sunset and night, with traffic, people, trains and a helicopter moving
-- **An interactive Three.js page** (one HTML file) with orbit controls, a time-of-day slider and the same moving life
+<p align="center">
+  <a href="examples/lotus-tower"><img src="examples/lotus-tower/media/still_photo_view.jpg" width="900" alt="The Lotus Tower, Colombo, rebuilt in Blender and matched to a reference photo"></a>
+</p>
 
-It was born from rebuilding the Lotus Tower in Colombo, which ships as the worked example:
-[examples/lotus-tower](examples/lotus-tower) (stills, a 50 second film, the web page).
+<p align="center"><sub>The Lotus Tower, Colombo: rebuilt from a few photos, a map pin and a 900 m radius. Not a photograph.</sub></p>
 
-[![Lotus Tower, Colombo, rebuilt in 3D](examples/lotus-tower/media/preview.gif)](examples/lotus-tower)
+<p align="center">
+  <a href="examples/lotus-tower/media/lotus_tower_film.mp4"><img src="examples/lotus-tower/media/film_play.jpg" width="760" alt="Play the Lotus Tower film: 50 seconds, day, sunset and night"></a>
+</p>
 
-- **Live 3D demo:** [bishrulhaq.com/demos/lotus-tower-3d.html](https://bishrulhaq.com/demos/lotus-tower-3d.html) : the Lotus Tower in your browser. Orbit it,
-  follow the bus, the train or the helicopter, drag the time from noon to night. (This is the hand-tuned viewer
-  from the original Lotus Tower project; `pf web` builds a plainer page of the same kind for any place.)
-- **Film:** [50 seconds, day, sunset and night](examples/lotus-tower/media/lotus_tower_film.mp4)
-- **Read more:** [Rebuild Any Landmark in 3D: Photos, a Map Pin, and the Loop That Makes It Real](https://bishrulhaq.com/posts/rebuild-any-landmark-in-3d)
+<p align="center"><sub>The film: 50 seconds, day, sunset and night, with sound. Click to play.</sub></p>
+
+## What it does
+
+You give it reference photos of a place, where it is on the map and how many metres around it you want. It builds
+the place in Blender on real OpenStreetMap data, models the landmark from your photos, and then improves the result
+in a loop: render, compare with the photo by numbers and by eye, fix the worst gap, render again.
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="examples/lotus-tower"><img src="examples/lotus-tower/media/still_drone.jpg" alt="A Cycles still of the tower and its neighbourhood from above"></a><br><b>Stills</b><br><sub>Blender Cycles, matched to your reference photo</sub></td>
+    <td align="center" width="33%"><a href="examples/lotus-tower/media/lotus_tower_film.mp4"><img src="examples/lotus-tower/media/film_sunset.jpg" alt="A frame of the film at sunset"></a><br><b>A film</b><br><sub>Any length: day, sunset, night, with traffic, people, trains, a helicopter</sub></td>
+    <td align="center" width="33%"><a href="https://bishrulhaq.com/demos/lotus-tower-3d.html"><img src="examples/lotus-tower/media/viewer_day.jpg" alt="The interactive Three.js page"></a><br><b>An interactive page</b><br><sub>One HTML file: orbit, views, a time-of-day slider, the same moving life</sub></td>
+  </tr>
+</table>
+</div>
+
+## The loop that makes it real
+
+<p align="center">
+  <img src="examples/lotus-tower/media/loop_progress.jpg" width="900" alt="Four renders of the same view, from loop 1 to loop 22, each with what changed and its difference from the reference photo">
+</p>
+
+<p align="center"><sub>Loop 1 to loop 22 of the Lotus Tower. The bar is the difference from the reference photo: lower is better.</sub></p>
+
+Each round: render, compare, fix the one to three largest gaps, render again. Wide view first, then the district,
+the landmark, the street, a single detail. Each finished project adds its lessons to `references/lessons.md`, which
+the skill reads before the next place.
+
+## Gallery: the Lotus Tower
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="examples/lotus-tower/media/viewer_night.jpg" alt="The interactive page at night"><br><sub>The interactive page after dark</sub></td>
+    <td align="center" width="33%"><img src="examples/lotus-tower/media/still_street.jpg" alt="A street by the lake with a city bus"><br><sub>Street level: traffic on the correct side</sub></td>
+    <td align="center" width="33%"><img src="examples/lotus-tower/media/still_helicopter.jpg" alt="A helicopter over the lake"><br><sub>A helicopter over Beira Lake</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="examples/lotus-tower/media/still_fountain.jpg" alt="The fountain on the forecourt"><br><sub>The forecourt fountain</sub></td>
+    <td align="center"><img src="examples/lotus-tower/media/still_plaza.jpg" alt="The plaza at the foot of the tower"><br><sub>The plaza, close up</sub></td>
+    <td align="center"><img src="examples/lotus-tower/media/film_night.jpg" alt="The tower lit at night over the city lights"><br><sub>Night: the tower's LED show</sub></td>
+  </tr>
+</table>
+</div>
+
+<p align="center">
+  <a href="https://bishrulhaq.com/demos/lotus-tower-3d.html"><b>Open the live 3D demo</b></a><br>
+  <sub>Orbit the tower, follow the bus, the train or the helicopter, drag the time from noon to night.<br>
+  This demo is the hand-tuned viewer from the original Lotus Tower project; <code>pf web</code> builds a plainer page of the same kind for any place.</sub>
+</p>
+
+<p align="center">
+  More stills, the full film and the run steps: <a href="examples/lotus-tower"><b>examples/lotus-tower</b></a>
+</p>
 
 ## What you need
 

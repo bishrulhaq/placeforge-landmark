@@ -5,11 +5,9 @@ reference photos, a map pin and a 900 m radius.
 
 **Live 3D demo:** [bishrulhaq.com/demos/lotus-tower-3d.html](https://bishrulhaq.com/demos/lotus-tower-3d.html)  ·  **Article:** [bishrulhaq.com/posts/rebuild-any-landmark-in-3d](https://bishrulhaq.com/posts/rebuild-any-landmark-in-3d)
 
-[![Lotus Tower film: click to play](media/film_poster.jpg)](media/lotus_tower_film.mp4)
+[![Play the Lotus Tower film](media/film_play.jpg)](media/lotus_tower_film.mp4)
 
 **The film** (50 s: a one-second opening card with the map, then day, sunset and night): [`media/lotus_tower_film.mp4`](media/lotus_tower_film.mp4)
-
-![Preview of the film](media/preview.gif)
 
 ## Stills (Blender Cycles)
 
