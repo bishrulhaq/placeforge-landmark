@@ -914,7 +914,7 @@ def street_lamps(mp, rng):
 
 # ---------------------------------------------------------------- ground, water, roads, railways
 def ground(mp):
-    R = max(mp.FR * 6.0, 30000.0)
+    R = max(mp.FR * 6.0, 200000.0)          # past the horizon of a camera 2 km up: no edge of the world in the frame
     bm = bmesh.new()
     bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=R)
     pf.mesh_obj("ground", bm, [look.mat_ground(mp.R, mp.FR)])

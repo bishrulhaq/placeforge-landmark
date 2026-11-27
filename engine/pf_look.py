@@ -91,7 +91,10 @@ def world(sc):
     g = geo(nt)
     d = VM(nt, "SCALE", g.outputs["Incoming"])
     d.node.inputs["Scale"].default_value = -1.0
-    _, _, dz = sep(nt, d)
+    dx, dy, dz = sep(nt, d)
+    # below the horizon the sky keeps the horizon's colour: the ground is flat and finite, so a high camera sees a
+    # sliver of sky under its far edge, and the physical sky is dark there (a hard line across the frame)
+    nt.links.new(comb(nt, dx, dy, M(nt, "MAXIMUM", dz, 0.004)), sky.inputs["Vector"])
     t = pf.tod()
     lp = nd(nt, "ShaderNodeLightPath")
     if t == "night":
@@ -149,7 +152,9 @@ def haze(reach):
     nt.links.new(s.outputs[0], out.inputs["Volume"])
     top = float(cfg("look.haze_top_m", 800))
     bm = bmesh.new()
-    pf.cube(bm, (0, 0, top / 2), (reach * 2, reach * 2, top))
+    # the slab starts below the ground: a floor lying exactly on the ground plane turns the ground black for any
+    # camera above the slab (a top-down view of a tall landmark)
+    pf.cube(bm, (0, 0, (top - 60.0) / 2), (reach * 2, reach * 2, top + 60.0))
     pf.mesh_obj("haze", bm, [m])
 
 

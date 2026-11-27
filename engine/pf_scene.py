@@ -76,7 +76,7 @@ def main():
     rng = random.Random(7)
     trees = city.finish(mp, B, trees, rng)
     reach = max(mp.FR * 4.0, 25000.0)
-    look.haze(reach)
+    look.haze(max(reach, 60000.0))              # far enough to be opaque at its edge; a box as big as the ground shows a hard line at the horizon
     look.clouds(reach)
     if arg("grade", "1") == "1":
         look.grade(sc)
