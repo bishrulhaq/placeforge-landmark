@@ -38,3 +38,10 @@ improves from one use to the next.
   direction is certain (two frames a second apart), not from one still.
 - Licensed photo sources gave many views from the tower and almost none of it. The match target was a night photo;
   the day look was judged by eye against close-ups. Ask for a daylight, level, whole-landmark photo at intake.
+- The user judged the neighbours next, and in the web viewer, not in the stills: generic blocks beside a careful
+  landmark read as "not sane". The named neighbours need their own pass (section 5b), and every detail has to exist
+  in the viewer too: arches, windows and balcony bands as geometry, floor and mullion grids through `pf.viewer_facade`.
+- A pale stone in shade under a blue sky renders grey-green. Warm the base colour beyond the photo sample and check
+  the shaded side against a photo of the shaded side.
+- A dolly whose look point travels past the camera swings the view into the sky halfway. Keep both look points far
+  from the camera path, and pick a frame from the middle of every shot, not only its ends.
