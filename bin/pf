@@ -610,8 +610,17 @@ def cmd_film(args):
         die("ffmpeg not found")
     raw = os.path.join(proj, "film", "film_raw.mp4")
     frames = sorted(glob.glob(os.path.join(proj, "film", "frames", "f*.png")))
-    if mode(proj) != "local" and not os.path.exists(raw):
-        print("pulled:", remote_pull(proj, "film", pattern="film_raw.mp4"))
+    if mode(proj) != "local":
+        inst = os.path.join(proj, ".pf", "gpu" + ("-" + os.environ["PF_GPU_NAME"] if os.environ.get("PF_GPU_NAME") else ""), "instance")
+        machine = mode(proj) == "ssh" or (os.path.exists(inst) and os.path.getsize(inst) > 0)
+        if machine:
+            # A render machine is up: its film is the new one. An earlier film's raw file still lying here must not
+            # be encoded in its place (it was: same bytes out, old shots), so it is set aside first.
+            if os.path.exists(raw):
+                os.replace(raw, raw[:-4] + "_previous.mp4")
+            print("pulled:", remote_pull(proj, "film", pattern="film_raw.mp4"))
+        elif os.path.exists(raw):
+            print("no render machine is up: encoding the film_raw.mp4 already here (%s)" % time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(raw))))
     if os.path.exists(raw):
         src = ["-i", raw]
     elif frames:
