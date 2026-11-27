@@ -427,6 +427,7 @@ class Blocks:
         self.v, self.f, self.col, self.roof, self.glass, self.rnd = [], [], [], [], [], []
         self.params = []          # one row per box, for the web viewer
         self.polys = []           # extruded footprints, for the web viewer
+        self.tops = []            # (x, y, reach, top z) of every building: what a flight path must clear
 
     def face(self, idx, col, roof, glass, rnd):
         self.f.append(idx)
@@ -437,6 +438,7 @@ class Blocks:
 
     def box(self, cx, cy, w, d, h, rot, wall, roofc, glass=0.0, rnd=0.5, z0=0.0, pitch=0.0, top=True):
         self.params.append((cx, cy, z0, w, d, h, rot, pitch, 1.0 if top else 0.0, *wall, *roofc, glass, rnd))
+        self.tops.append((cx, cy, 0.5 * math.hypot(w, d), z0 + h))
         c, s = math.cos(rot), math.sin(rot)
         P = [(cx + x * c - y * s, cy + x * s + y * c) for x, y in ((-w / 2, -d / 2), (w / 2, -d / 2), (w / 2, d / 2), (-w / 2, d / 2))]
         b = len(self.v)
@@ -463,6 +465,8 @@ class Blocks:
 
     def poly(self, pts, h, wall, roofc, glass=0.0, rnd=0.5, z0=0.0):
         """A footprint (counter-clockwise) extruded to a flat roof."""
+        mx, my = sum(q[0] for q in pts) / len(pts), sum(q[1] for q in pts) / len(pts)
+        self.tops.append((mx, my, max(math.hypot(q[0] - mx, q[1] - my) for q in pts), z0 + h))
         self.polys.append([round(h, 2), round(z0, 2), *[round(c, 3) for c in (*wall, *roofc)], glass, round(rnd, 3),
                            [round(c, 2) for q in pts for c in q]])
         n, b = len(pts), len(self.v)
@@ -1108,6 +1112,7 @@ def build(seed=1, keep_out=()):
 def finish(mp, B, trees, rng):
     """After the landmark has claimed its ground: drop trees it displaced, then make the big meshes."""
     trees = [t for t in trees if not mp.kept_out(t[0], t[1], 2.0)]
+    mp.tops = B.tops
     B.build("city", look.mat_buildings())
     if trees:
         scatter("trees", trees, tree_protos())

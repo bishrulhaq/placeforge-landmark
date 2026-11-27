@@ -459,9 +459,11 @@ function buildLife(buf) {
     root.rotation.order = 'ZYX';
     ZUP.add(root);
     window.__heli = root;
-    tick.push(t => { const a = Hh.a0 - Hh.w * t;
-      root.position.set(Hh.cx + Hh.r * Math.sin(a), Hh.cy + Hh.r * Math.cos(a), Hh.z + 2.5 * Math.sin(t * 0.6));
-      root.rotation.set(THREE.MathUtils.degToRad(Hh.bank), THREE.MathUtils.degToRad(-3), -a);
+    // the same flight as the film (engine/pf_core.py heli_at): clockwise seen from above, nose first, banked into the turn, nose down
+    tick.push(t => { const a = Hh.a0 + Hh.w * t;
+      root.position.set(Hh.cx + Hh.r * Math.sin(a), Hh.cy + Hh.r * Math.cos(a), Hh.z + 1.2 * Math.sin(t * 0.45));
+      root.rotation.set(THREE.MathUtils.degToRad(Hh.bank), THREE.MathUtils.degToRad(Hh.pitch ?? 4), -a);
+      window.__heliAt = [root.position.x, root.position.y, root.position.z, a];
       main.rotation.z = t * 6.2832 * Hh.rps;
       tail.rotation.set(0, 0, 0); tail.rotation['xyz'[Hh.tail_axis]] = t * 6.2832 * Hh.tail_rps; });
   }
@@ -472,8 +474,15 @@ function buildLife(buf) {
 const VIEWS = { ...META.views };
 if (META.photo) { const b = THREE.MathUtils.degToRad(META.photo.bearing), f = META.photo.from;
   VIEWS.photo = { from: f, to: [f[0] + Math.sin(b) * Math.hypot(f[0], f[1]), f[1] + Math.cos(b) * Math.hypot(f[0], f[1]), Math.max(H * 0.45, f[2] * 0.6)], lens: META.photo.lens }; }
+let follow = false;                     // the camera rides behind the helicopter until a view is chosen or the scene is dragged
+function setFollow(on) { follow = on && !!window.__heli; const b = document.getElementById('followBtn'); if (b) b.classList.toggle('on', follow);
+  if (follow) document.querySelectorAll('#views button:not(#followBtn)').forEach(x => x.classList.remove('on')); }
+function chase() { const h = window.__heliAt; if (!h) return; const [x, y, z, a] = h, fx = Math.cos(a), fy = -Math.sin(a), ox = Math.sin(a), oy = Math.cos(a);
+  camera.position.copy(W(x - fx * 9 + ox * 30, y - fy * 9 + oy * 30, z + 3));       // off its outer side, a little behind: the landmark stands beyond it
+  controls.target.copy(W(x, y, z)); }
 function setView(name) {
   const v = VIEWS[name]; if (!v) return;
+  setFollow(false);
   camera.position.copy(W(...v.from)); controls.target.copy(W(...v.to));
   const hf = 2 * Math.atan(18 / (v.lens || 35));
   camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hf / 2) / Math.max(camera.aspect, 1)));
@@ -482,6 +491,8 @@ function setView(name) {
 }
 const order = ['photo', 'hero', 'wide', 'close', 'street', 'top'].filter(k => VIEWS[k]).concat(Object.keys(VIEWS).filter(k => !['photo', 'hero', 'wide', 'close', 'street', 'top'].includes(k)));
 for (const k of order) { const b = document.createElement('button'); b.textContent = k.replace(/_/g, ' '); b.dataset.view = k; b.onclick = () => setView(k); document.getElementById('views').appendChild(b); }
+if (META.life && META.life.heli) { const b = document.createElement('button'); b.id = 'followBtn'; b.textContent = 'follow helicopter';
+  b.onclick = () => { setFollow(true); camera.fov = 38; camera.updateProjectionMatrix(); }; document.getElementById('views').appendChild(b); }
 for (const [label, href] of Object.entries(META.links || {})) { const a = document.createElement('a'); a.className = 'lnk'; a.textContent = label; a.href = href; a.target = '_blank'; a.rel = 'noopener'; document.getElementById('links').appendChild(a); }
 document.getElementById('hide').onclick = () => document.getElementById('ui').classList.toggle('min');
 const sunIn = document.getElementById('sun');
@@ -509,6 +520,8 @@ const hv = Object.fromEntries(hash.filter(s => s.includes('=')).map(s => s.split
 if (hv.t !== undefined) sunIn.value = hv.t;
 setSun(+sunIn.value);
 setView(VIEWS[hash[0]] ? hash[0] : order[0]);
+controls.addEventListener('start', () => setFollow(false));
+if (hv.follow === 'heli') { setFollow(true); camera.fov = 38; camera.updateProjectionMatrix(); }
 if (hv.cam) { const c = hv.cam.split(',').map(Number); camera.position.copy(W(c[0], c[1], c[2])); controls.target.copy(W(c[3], c[4], c[5])); controls.update(); }
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
 const T0 = +(hv.time || 0);            // #view&time=12 starts the life 12 s in (testing)
@@ -517,6 +530,7 @@ let frames = 0;
 renderer.setAnimationLoop(() => {
   timeU.value = clock.getElapsedTime();
   for (const f of tick) f(timeU.value + T0);
+  if (follow) chase();
   controls.update();
   sun.target.position.copy(controls.target);
   sun.position.copy(controls.target).addScaledVector(sunDirW, 4000);

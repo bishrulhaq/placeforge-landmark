@@ -69,8 +69,10 @@ def main():
     mp, B, trees = city.build(int(arg("seed", 1)), getattr(lm, "KEEP_OUT", ()))
     H = float(cfg("landmark.height_m", 0) or 0)
     if lm:
+        before = set(bpy.data.objects)
         info = lm.build(mp) or {}
         H = float(info.get("height", H) or H)
+        pf.LANDMARK = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
     if H <= 0:                                    # no model, no stated height: the tallest mapped thing at the pin
         H = max([b.get("h", 0) or 0 for b in mp.buildings if city.inside(b["p"], 0.0, 0.0)] + [30.0])
     rng = random.Random(7)

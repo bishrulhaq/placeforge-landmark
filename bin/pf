@@ -557,7 +557,7 @@ def cmd_film(args):
         k = secs / sum(s["seconds"] for s in shots)
         for s in shots:
             s["seconds"] = round(s["seconds"] * k, 2)
-        json.dump({"fps": fps, "note": "Edit freely. Each shot: name, seconds, tod (day|sunset|night), move (orbit|dolly|topdown|photo). Bearings are compass degrees; positions are metres east, north, up from the pin.", "shots": shots}, open(sp, "w"), indent=1)
+        json.dump({"fps": fps, "note": "Edit freely. Each shot: name, seconds, tod (day|sunset|night), move (orbit|dolly|topdown|photo|heli). Bearings are compass degrees; positions are metres east, north, up from the pin.", "shots": shots}, open(sp, "w"), indent=1)
         print("film plan: %s  (%d shots, %.1f s, %d frames at %d fps)" % (sp, len(shots), secs, round(secs * fps), fps))
         print("check it without rendering: pf build %s anim=1   then stills of each shot: pf render ... or `pf film render %s pick=1,100,...`" % (proj, proj))
         return

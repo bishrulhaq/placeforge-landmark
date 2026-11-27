@@ -8,7 +8,7 @@ Every mover's place is a pure function of film time, so frames can render in any
 Three.js viewer replays exactly the same motion (export() hands it the same lanes, speeds and offsets):
     vehicles keep to their side of the road (region.drive), one speed per lane, looping along the street;
     walkers slide along footways and pavements while their mesh steps through poses baked from the walk action;
-    the helicopter flies a banked circle, main and tail rotor each turning about its own hub.
+    the helicopter flies a banked circle nose first (pf_core.heli_orbit), main and tail rotor each turning about its own hub.
 """
 import bpy, bmesh, colorsys, json, math, os, random
 from array import array
@@ -287,9 +287,9 @@ class Life:
             o.location, o.rotation_euler = (x, y, 0.30), (0, 0, a)
         h = self.heli
         if h:
-            ang = h["a0"] - h["w"] * t                     # clockwise seen from above
-            h["root"].location = (h["cx"] + h["r"] * math.sin(ang), h["cy"] + h["r"] * math.cos(ang), h["z"] + 2.5 * math.sin(t * 0.6))
-            h["root"].rotation_euler = (math.radians(h["bank"]), math.radians(-3.0), -ang)
+            x, y, z, ang = pf.heli_at(h, t)                # clockwise seen from above, nose first
+            h["root"].location = (x, y, z)
+            h["root"].rotation_euler = (math.radians(h["bank"]), math.radians(h["pitch"]), -ang)      # banked into the turn, nose down
             h["main"].rotation_euler = (0, 0, t * 2 * math.pi * h["rps"])
             h["tail"].rotation_euler = tuple(t * 2 * math.pi * h["tail_rps"] if i == h["tail_axis"] else 0.0 for i in range(3))
 
@@ -309,7 +309,7 @@ class Life:
         d["trains"] = [v for tr in self.trains for v in (tr[1], tr[2], tr[3], tr[4])]
         h = self.heli
         if h:
-            d["heli"] = {k: h[k] for k in ("cx", "cy", "r", "z", "a0", "w", "bank", "rps", "tail_rps", "tail_axis")}
+            d["heli"] = {k: h[k] for k in ("cx", "cy", "r", "z", "a0", "w", "bank", "pitch", "rps", "tail_rps", "tail_axis")}
             d["heli"].update(main_hub=list(h["main"].location), tail_hub=list(h["tail"].location),
                              soups=[soup(h["body"].data, 4200), soup(h["main"].data, 500), soup(h["tail"].data, 200)])
         return d
@@ -463,11 +463,9 @@ def build(mp, rng, H=60.0):
             dims = [max(v.co[i] for v in tl.data.vertices) - min(v.co[i] for v in tl.data.vertices) for i in range(3)]
             for o in (body, main, tl):
                 o.parent = root
-            r = float(cfg("life.heli_radius", 0) or max(0.9 * H + 110.0, 200.0))
-            z = float(cfg("life.heli_height", 0) or max(0.6 * H, 80.0))
-            L_.heli = {"root": root, "body": body, "main": main, "tail": tl, "cx": 0.0, "cy": 0.0, "r": r, "z": z,
-                       "a0": math.radians(float(cfg("life.heli_bearing", 140))), "w": 30.0 / r, "bank": 9.0, "rps": 6.3, "tail_rps": 27.0,
-                       "tail_axis": dims.index(min(dims))}
+            L_.heli = dict(pf.heli_orbit(H, getattr(mp, "tops", ())), root=root, body=body, main=main, tail=tl, rps=6.3, tail_rps=27.0,
+                           tail_axis=dims.index(min(dims)))
+            pf.HELI = L_.heli
     L_.update(1, 0.0)
     pf.log("life: %d vehicles moving, %d parked, %d people, %d train cars, helicopter %s (models: %s)" % (
         len(L_.cars), len(L_.parked), len(L_.walkers), len(L_.trains), "yes" if L_.heli else "no", ", ".join(sorted(have))))

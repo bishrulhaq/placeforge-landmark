@@ -48,6 +48,50 @@ ARGS = _args()
 CFG = {}
 PROJECT = ""
 TIMED = []          # (socket, f(t seconds)): shader values the film sets every frame
+HELI = None         # the helicopter's orbit once the life is built (heli_orbit); the film camera follows it
+LANDMARK = []       # the landmark's mesh objects (pf_scene fills it): flight paths keep clear of them
+
+
+def heli_orbit(H, tops=()):
+    """The helicopter's circle round the landmark, with the attitude a real one holds on it. It flies clockwise seen
+    from above (the landmark off its right side), nose first. A steady turn at speed v on radius r is flown banked
+    into the turn by atan(v^2 / (g r)); forward flight tilts the rotor disc, and the nose with it, a few degrees down.
+
+    The circle is checked against what stands in its way, and moved if it would not clear it by life.heli_clear_m
+    (default 60 m, a margin for the picture, not an aviation rule): outward, if the landmark itself reaches the
+    flight level within that distance; upward, over every building whose footprint comes within it of the track.
+    tops: [(x, y, reach, top z)] of the buildings (Map.tops)."""
+    r = float(cfg("life.heli_radius", 0) or max(0.9 * H + 110.0, 200.0))
+    z = float(cfg("life.heli_height", 0) or max(0.6 * H, 80.0))
+    v = float(cfg("life.heli_speed", 30.0))
+    clear = float(cfg("life.heli_clear_m", 60.0))
+    r0, z0 = r, z
+    # the landmark: its widest reach at and above the flight level (a tower narrows as it rises; a dome does not)
+    reach = 0.0
+    for o in LANDMARK:
+        mw = o.matrix_world
+        for vtx in o.data.vertices:
+            p = mw @ vtx.co
+            if p.z > z - clear:
+                reach = max(reach, math.hypot(p.x, p.y))
+    if reach and r < reach + clear:
+        r = reach + clear
+    # the buildings under and beside the track
+    top = max([t for x, y, m, t in tops if abs(math.hypot(x, y) - r) < m + clear] + [0.0])
+    if z < top + clear:
+        z = top + clear
+    if (r, z) != (r0, z0):
+        log("helicopter: orbit moved to keep %.0f m clear: radius %.0f -> %.0f m, height %.0f -> %.0f m (landmark reach %.0f m at flight level, tallest building by the track %.0f m)"
+            % (clear, r0, r, z0, z, reach, top))
+    return {"cx": 0.0, "cy": 0.0, "r": r, "z": z, "a0": math.radians(float(cfg("life.heli_bearing", 140))), "w": v / r, "v": v,
+            "bank": math.degrees(math.atan(v * v / (9.81 * r))), "pitch": 2.0 + v * 0.07, "clear": clear}
+
+
+def heli_at(h, t):
+    """Where it is at t seconds: (x, y, z, bearing of its position from the centre, in radians). It heads along
+    bearing + 90 degrees, so its yaw about +Z (model nose on +X) is -bearing."""
+    a = h["a0"] + h["w"] * t
+    return h["cx"] + h["r"] * math.sin(a), h["cy"] + h["r"] * math.cos(a), h["z"] + 1.2 * math.sin(t * 0.45), a
 
 
 def arg(name, default=None):

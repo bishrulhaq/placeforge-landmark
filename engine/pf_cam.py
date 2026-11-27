@@ -141,6 +141,18 @@ def shot_pose(s, f):
             tg = Vector(s.get("target", [0, 0, loc.z]))
             k = float(s.get("push", 0.15)) * t
             return loc.lerp(tg, k), look0.lerp(tg, 0.5 + 0.5 * t), lens * (1 + 0.1 * t)
+    if mv == "heli" and pf.HELI:
+        # An air-to-air camera flying with the helicopter: `out` metres off its outer side (away from the landmark,
+        # so the landmark stands beyond it), `back` metres behind, `up` above. `lead`: metres the look point sits
+        # from the helicopter toward the target.
+        h = pf.HELI
+        x, y, z, a = pf.heli_at(h, (f - 1) / float(cfg("film.fps", 24)))
+        fwd, out = Vector((math.cos(a), -math.sin(a), 0.0)), Vector((math.sin(a), math.cos(a), 0.0))
+        P = Vector((x, y, z))
+        loc = P - fwd * _pair(s.get("back", [12, 4]), t) + out * _pair(s.get("out", [36, 27]), t) + Vector((0, 0, _pair(s.get("up", [3, 2]), t)))
+        tg = Vector(s.get("target", [h["cx"], h["cy"], z]))
+        d = tg - P
+        return loc, P + d.normalized() * _pair(s.get("lead", 0.0), t) if d.length > 1e-3 else P, _pair(s.get("lens", 35), t)
     tg = Vector(s.get("target", [0, 0, 0]))                    # orbit
     b = math.radians(_pair(s.get("bearing", [200, 250]), t))
     r, h = _pair(s.get("radius", [300, 260]), t), _pair(s.get("height", [120, 140]), t)

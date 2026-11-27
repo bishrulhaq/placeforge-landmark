@@ -222,10 +222,13 @@ pf film render P                                      # all frames (on a rented 
 pf film encode P --music track.mp3 --music-start 12   # -> P/film/<name>_film.mp4, fades in and out
 ```
 
-Shots are `orbit`, `dolly`, `topdown` or `photo` moves in metres and compass bearings (`engine/pf_cam.py` has the
+Shots are `orbit`, `dolly`, `topdown`, `photo` or `heli` moves in metres and compass bearings (`engine/pf_cam.py` has the
 fields). One Blender process renders one time of day; frames can render in any order on several machines because
 every mover's position is a function of time. Portrait: `film.w` 1080, `film.h` 1920 in `place.json`. Music needs
 a licence the user holds; put the credit line in the video description.
+
+A `heli` shot flies beside the helicopter with the landmark behind it: `{"move": "heli", "out": [36, 27], "back": [12, 4],
+"up": [3, 2], "lens": 35}` (metres off its outer side, behind it, above it).
 
 ## 8. Interactive page (Blender to Three.js)
 
@@ -236,7 +239,7 @@ pf shot P photo --t 40        # headless Chrome screenshot (view name, sun eleva
 
 The page shows the same city and landmark with orbit controls, view buttons and a time-of-day slider, and the same
 life as the film: traffic keeping to its side of the road, parked cars, people walking, trains, the helicopter
-circling with both rotors turning, head lamps at night. It is a real-time look, not Cycles. Shader detail made
+circling with both rotors turning (a "follow helicopter" button rides beside it), head lamps at night. It is a real-time look, not Cycles. Shader detail made
 with nodes does not travel: give such materials an average colour with `pf.viewer_color(...)` (see the landmark
 reference). Vehicle models are thinned to about 1,100 triangles for the page; people are kept whole (a thinned
 figure falls apart).
@@ -262,6 +265,9 @@ Traps and their fixes (slow hosts, OptiX failures, killed jobs, transfers): [ref
 - The far ring is generated, not mapped building by building.
 - A camera with a tilted horizon or strong lens distortion will not match exactly.
 - Traffic follows lanes at one speed per lane: no junction rules, no overtaking. People walk; they do not stand, sit or cross.
-- One helicopter on a circle (`life.helicopter`, `life.heli_radius`, `life.heli_height`, `life.heli_bearing`); no birds or aircraft (frozen wings read as fake).
+- One helicopter on a circle (`life.helicopter`, `life.heli_radius`, `life.heli_height`, `life.heli_bearing`, `life.heli_speed`). It flies
+  nose first, banked for its speed and radius, and its circle is moved out or up to stay `life.heli_clear_m` (60 m) clear of the
+  landmark and of every building by its track; the build log says when it was moved. It does not weave between buildings, land or hover.
+  No birds or aircraft (frozen wings read as fake).
 - Tested with Blender 5.2 on macOS (build, export, viewer). The rented-GPU path is ported from the scripts that
   rendered the Lotus Tower; check the first preview before queuing a film.
