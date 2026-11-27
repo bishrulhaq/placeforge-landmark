@@ -41,6 +41,10 @@ What is generated and what is not:
 7. **Never claim a match you did not check.** Every "it matches" comes with a `pf compare` number and the
    side-by-side you looked at.
 
+8. **Small things decide whether it reads as real.** Once the big shapes match, do a detail pass at every scale:
+   list what the photos show that the model does not, and add it. Do this without being asked, and do not call
+   the place finished while the list has open rows (see "The detail pass" under the loop).
+
 ## 0. Intake: what to ask the user
 
 Ask only for what is missing. Use one round of questions.
@@ -180,6 +184,29 @@ The loop is recursive in three ways:
 - **Across projects.** When a project ends, add what made it real, in two or three lines, to
   [references/lessons.md](references/lessons.md). Read that file before starting the next place. The skill gets
   better each time it is used.
+
+### The detail pass
+
+A viewer forgives a wrong tone long before a missing railing. After the wide view converges, zoom each close-up
+photo to full size and write a table in `renders/LOOPS.md`: one row per small thing seen, a column "in the model"
+(yes, no, cannot be seen from any view), and close each "no" before the finals. Look for:
+
+- **On the landmark:** parapets and railings on every terrace, the crown or cap of each setback, plant rooms, antennas,
+  lightning rods, cleaning rigs, louvre bands, panel joints, recesses between volumes, entrances, canopies, steps,
+  signs. Count repeated things on the photo; do not guess the number.
+- **At its foot:** paving patterns, kerbs, planters, palms or trees in rows, flag poles, bollards, lamp posts, benches,
+  fountains and their nozzles, pools, bridges, boats, the edge detail where land meets water.
+- **Round it:** the two or three neighbours a local would name (a mall, a hotel, an opera house). The map gives the
+  outline; give each its real height, colour and one recognisable feature. Check how the map stores them: a
+  building mapped under another tag can be missing altogether.
+- **At night:** aviation lights (red, steady or blinking) on every tall thing, strobes, the landmark's own lighting
+  scheme as it is on an ordinary night, lit entrances, lamps along the water.
+- **In motion (film and viewer):** whatever moves in the real place and is missing here, as long as it can move
+  honestly: fountain jets, boats, lifts, blinking lights. A frozen thing that should move is worse than no thing.
+
+Render each added detail close up (`views` in `place.json`), then again in the wide view to check it survives the
+distance without flicker. A detail smaller than a pixel in every delivered view is not worth its render time: say so
+in the table and move on.
 
 What to tune and what each knob does: [references/look.md](references/look.md).
 

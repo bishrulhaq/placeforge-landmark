@@ -53,7 +53,8 @@ turned to true north at the end (see `TURN` in the Lotus example).
 1. Big volumes and the silhouette. Check against the blend overlay before any detail.
 2. The silhouette's corners: where shapes meet (collars, cornices, setbacks, the crown).
 3. Materials: start with constant colours sampled from the photo in sunlight, then joints and panels.
-4. Small parts: railings, antennas, plant rooms, the plinth and the plaza it stands on.
+4. Small parts: railings, antennas, plant rooms, the plinth and the plaza it stands on. This is the detail pass of
+   SKILL.md, section 6: work from the table of things seen in the close-ups, not from memory of the building.
 5. Night: a few emissive materials at low strength. Bright saturated emission turns white under AgX.
 
 Rules that came from real mistakes:
