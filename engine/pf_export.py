@@ -131,7 +131,7 @@ def export(mp, B, trees, H, life=None):
             "photo": {"from": list(pose[0]), "bearing": pose[1], "lens": pose[2]} if pose else None,
             "sun": {"elevation": cfg("time.day.sun_elevation"), "bearing": cfg("time.day.sun_bearing"),
                     "sunset_bearing": cfg("time.sunset.sun_bearing")},
-            "water": cfg("region.water"), "sea": cfg("region.sea"), "chunks": chunks, "meshes": meshes,
+            "water": cfg("region.water"), "sea": cfg("region.sea"), "ground": cfg("region.ground", None), "chunks": chunks, "meshes": meshes,
             "tree_kinds": ["broad", "round", "tall", "palm", "conifer"], "life": lf}
     json.dump(meta, open(os.path.join(out, "scene.json"), "w"), separators=(",", ":"))
     with gzip.open(os.path.join(out, "scene.bin.gz"), "wb", 6) as f:

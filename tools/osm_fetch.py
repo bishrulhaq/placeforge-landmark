@@ -80,7 +80,8 @@ def api_tiles(lat, lon, radius):
 
 def q_near(lat, lon, r):
     a = "(around:%d,%.6f,%.6f)" % (r, lat, lon)
-    sel = ['way%s[building]', 'relation%s[building]', 'way%s["building:part"]', 'way%s[highway]', 'way%s[railway]',
+    sel = ['way%s[building]', 'relation%s[building]', 'way%s["building:part"]', 'way%s[shop=mall]', 'relation%s[shop=mall]',
+           'way%s[highway]', 'way%s[railway]',
            'way%s[natural]', 'relation%s[natural]', 'way%s[waterway]', 'relation%s[waterway]', 'way%s[landuse]',
            'relation%s[landuse]', 'way%s[leisure]', 'relation%s[leisure]', 'way%s[amenity~"parking|fountain"]',
            'way%s[man_made~"pier|breakwater|bridge|groyne"]', 'way%s[place=square]', 'node%s[natural=tree]',
@@ -210,6 +211,13 @@ def convert(d, lat0, lon0, radius, far=False):
             out["buildings"].append(building(t, p))
         elif "building:part" in t and t["building:part"] != "no" and not far:
             out["buildings"].append(building(t, p, True))
+        elif t.get("shop") == "mall" and not far:
+            # a mall drawn as an outline with no building tag (the Dubai Mall is one): a building all the same,
+            # four tall retail floors unless the map says otherwise
+            m = building(dict(t, building="retail"), p)
+            if "h" not in m and "lv" not in m:
+                m["h"] = 24.0
+            out["buildings"].append(m)
         elif t.get("natural") == "water" or t.get("waterway") in ("riverbank", "dock") or t.get("landuse") in ("reservoir", "basin"):
             out["water"].append({"p": p, "k": t.get("water", "water"), "name": t.get("name")})
         else:
@@ -263,14 +271,21 @@ def convert(d, lat0, lon0, radius, far=False):
             out["points"].append({"k": "lamp", "x": q[0], "y": q[1]})
         elif t.get("amenity") in ("fountain", "bench"):
             out["points"].append({"k": t["amenity"], "x": q[0], "y": q[1]})
-    # a building drawn in 3D parts: keep the parts, drop the outline they sit in
+    # a building drawn in 3D parts: keep the parts, drop the outline they sit in. Only when the parts really make
+    # up the building (half its footprint or more): a mall with one mapped car park inside must keep its outline
     parts = [b for b in out["buildings"] if b.get("part")]
     if parts:
-        cents = [(sum(q[0] for q in b["p"]) / len(b["p"]), sum(q[1] for q in b["p"]) / len(b["p"])) for b in parts]
+        def _area(p):
+            return abs(sum(p[i][0] * p[(i + 1) % len(p)][1] - p[(i + 1) % len(p)][0] * p[i][1] for i in range(len(p)))) / 2
+
+        cents = [(sum(q[0] for q in b["p"]) / len(b["p"]), sum(q[1] for q in b["p"]) / len(b["p"]), _area(b["p"])) for b in parts]
         keep = []
         for b in out["buildings"]:
-            if not b.get("part") and any(inside(b["p"], cx, cy) for cx, cy in cents):
-                continue
+            if not b.get("part"):
+                # parts overlap one another (tiers of a tower), so the largest one inside is the fair measure too
+                ins = [a for cx, cy, a in cents if inside(b["p"], cx, cy)]
+                if ins and (sum(ins) >= 0.5 * _area(b["p"]) or max(ins) >= 0.35 * _area(b["p"])):
+                    continue
             keep.append(b)
         out["buildings"] = keep
     return out

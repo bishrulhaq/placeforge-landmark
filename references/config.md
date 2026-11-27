@@ -33,6 +33,7 @@ Positions are metres east, north, up from the pin. Bearings are compass degrees 
 | `region.roof_tanks` | 0 to 1: rooftop water tanks (South Asia, Mediterranean, Latin America) |
 | `region.weathering` | 0 clean, 1 monsoon streaks and patchy roofs |
 | `region.trees` | Mix of `broad`, `round`, `tall`, `palm`, `conifer`. `region.tree_density`: multiplier |
+| `region.ground` | `[dark, light]`: bare land, when the default earth and worn grass is wrong (desert cities: sand) |
 | `region.water`, `region.sea` | Body colours. `region.shore`: `soft` or `wall`. `region.wind_bearing` |
 | `infill.density` | `"auto"`, 0 (off) to 1: lots along streets the map shows without buildings |
 | `infill.lot_m`, `infill.floors` | Lot size range and floors of generated buildings |

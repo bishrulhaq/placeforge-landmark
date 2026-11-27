@@ -306,12 +306,20 @@ def mat_ground(city_r, far_r):
     g = geo(nt)
     P = g.outputs["Position"]
     n1, n2 = noise_t(nt, P, 0.02, 6, 0.6), noise_t(nt, P, 0.15, 4, 0.6)
-    soil = ramp(nt, M(nt, "ADD", M(nt, "MULTIPLY", n1, 0.7), M(nt, "MULTIPLY", n2, 0.3)),
-                [(0.3, (0.06, 0.09, 0.025)), (0.45, (0.13, 0.12, 0.07)), (0.6, (0.19, 0.16, 0.11)), (0.75, (0.24, 0.22, 0.18))])
+    gr = cfg("region.ground", None)         # [dark, light]: bare land where the default earth and worn grass is wrong (desert)
+    if gr:
+        d0, d1 = tuple(gr[0]), tuple(gr[1])
+        lerp = lambda t: tuple(a + (b - a) * t for a, b in zip(d0, d1))
+        stops = [(0.3, d0), (0.45, lerp(0.4)), (0.6, lerp(0.75)), (0.75, d1)]
+        far_stops = [(0.0, lerp(0.2)), (0.3, lerp(0.6)), (0.45, (0.5, 0.48, 0.44)), (0.6, (0.62, 0.6, 0.56)), (0.75, lerp(1.0)), (0.9, (0.45, 0.45, 0.47))]
+    else:
+        stops = [(0.3, (0.06, 0.09, 0.025)), (0.45, (0.13, 0.12, 0.07)), (0.6, (0.19, 0.16, 0.11)), (0.75, (0.24, 0.22, 0.18))]
+        far_stops = [(0.0, (0.04, 0.08, 0.02)), (0.3, (0.05, 0.09, 0.03)), (0.45, (0.5, 0.48, 0.44)),
+                     (0.6, (0.62, 0.6, 0.56)), (0.75, (0.35, 0.12, 0.07)), (0.9, (0.45, 0.45, 0.47))]
+    soil = ramp(nt, M(nt, "ADD", M(nt, "MULTIPLY", n1, 0.7), M(nt, "MULTIPLY", n2, 0.3)), stops)
     vor = nd(nt, "ShaderNodeTexVoronoi", {"Scale": 0.045})
     nt.links.new(P, vor.inputs["Vector"])
-    far = ramp(nt, vor.outputs["Color"], [(0.0, (0.04, 0.08, 0.02)), (0.3, (0.05, 0.09, 0.03)), (0.45, (0.5, 0.48, 0.44)),
-                                          (0.6, (0.62, 0.6, 0.56)), (0.75, (0.35, 0.12, 0.07)), (0.9, (0.45, 0.45, 0.47))])
+    far = ramp(nt, vor.outputs["Color"], far_stops)
     dist = VM(nt, "LENGTH", VM(nt, "MULTIPLY", P, (1.0, 1.0, 0.0)), out=1)
     c = mix(nt, maprange(nt, dist, far_r * 0.9, far_r * 1.3), soil, far)
     p = principled(nt, c, 0.9)
