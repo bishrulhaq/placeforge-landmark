@@ -7,6 +7,7 @@
   pf map <project> [--api] [--reuse]        real map data inside the radius -> map/osm.json + map/preview.png
   pf photos <project> [--query Q] [--max N] [--browser]     find reference photos when the user gave none:
                                             licensed sources first; --browser adds a web image search (opt-in)
+  pf neighbours <project> [--top 25]        the notable buildings round the pin, most prominent first -> map/neighbours.md
   pf refs <project>                         contact sheet of the photos + the target with a pixel grid (for measuring)
   pf sun <project> --when "2021-03-14 15:30" --tz 5.5 [--write day|sunset]
   pf camera <project> --horizon ROW --base-row ROW --top-row ROW --height M --col COL
@@ -701,12 +702,58 @@ def cmd_photos(args):
     sys.exit(subprocess.run([sys.executable, os.path.join(TOOLS, "photos.py"), proj] + args).returncode)
 
 
+def cmd_neighbours(args):
+    """The buildings round the pin that a visitor would name or notice, most prominent first: what to research and,
+    if the user wants the neighbourhood at close-up quality, what to override or model by hand."""
+    proj = project(args)
+    mp_ = os.path.join(proj, "map", "osm.json")
+    if not os.path.exists(mp_):
+        die("no map yet: pf map %s" % proj)
+    d = json.load(open(mp_))
+    top = int(opt(args, "--top", 25))
+    R = float(d.get("meta", {}).get("radius_m", 1000))
+    rows = []
+    for b in d["buildings"]:
+        p = b["p"]
+        cx, cy = sum(q[0] for q in p) / len(p), sum(q[1] for q in p) / len(p)
+        dist = math.hypot(cx, cy)
+        if b.get("part") and dist < 80:
+            continue                                    # the landmark's own parts
+        ar = abs(sum(p[i][0] * p[(i + 1) % len(p)][1] - p[(i + 1) % len(p)][0] * p[i][1] for i in range(len(p)))) / 2
+        h = b.get("h") or (b.get("lv") or 0) * 3.5
+        name = b.get("name_en") or b.get("name") or ""
+        if not (name or h >= 60 or ar >= 6000) or dist > R * 1.08:
+            continue
+        # how much of a view from the pin it fills: height and width over distance
+        score = (max(h, 12.0) * max(math.sqrt(ar), 10.0)) / max(dist, 60.0) ** 1.2 * (1.5 if name else 1.0)
+        rows.append((score, name, b.get("k", ""), b.get("h"), b.get("lv"), ar, dist, math.degrees(math.atan2(cx, cy)) % 360, cx, cy))
+    rows.sort(key=lambda r: -r[0])
+    seen, out = set(), []
+    for r in rows:
+        key = r[1] or "%d,%d" % (r[8] // 40, r[9] // 40)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    lines = ["| # | name | kind | height m | levels | footprint m2 | from pin m | bearing | x, y |", "|---|---|---|---|---|---|---|---|---|"]
+    for i, (sc, name, k, h, lv, ar, dist, brg, cx, cy) in enumerate(out[:top], 1):
+        lines.append("| %d | %s | %s | %s | %s | %d | %d | %d | %d, %d |" % (
+            i, name or "(unnamed)", k, ("%.0f" % h) if h else "**not mapped**", ("%.0f" % lv) if lv else "-", ar, dist, brg, cx, cy))
+    txt = "\n".join(lines)
+    print(txt)
+    with open(os.path.join(proj, "map", "neighbours.md"), "w") as f:
+        f.write("# Neighbours of %s: the %d most prominent mapped buildings\n\nFrom `pf neighbours`. Height **not mapped** means the engine guesses it: look it up.\n"
+                "Override one in place.json: `\"neighbours\": [{\"match\": \"<part of its name>\", \"height_m\": 306, \"walls\": [r, g, b], \"glass\": 1}]`,\n"
+                "or point at it with `\"at\": [x, y]`. `\"drop\": true` removes the mapped stand-in when neighbours.py models it.\n\n%s\n\n(c) OpenStreetMap contributors\n" % (place(proj).get("name", ""), min(top, len(out)), txt))
+    print("\nwritten: %s" % os.path.join(proj, "map", "neighbours.md"))
+
+
 def cmd_map(args):
     proj = project(args)
     sys.exit(subprocess.run([sys.executable, os.path.join(TOOLS, "osm_fetch.py"), proj] + args).returncode)
 
 
-CMDS = {"photos": cmd_photos, "doctor": cmd_doctor, "locate": cmd_locate, "init": cmd_init, "map": cmd_map, "refs": cmd_refs, "sun": cmd_sun,
+CMDS = {"neighbours": cmd_neighbours, "photos": cmd_photos, "doctor": cmd_doctor, "locate": cmd_locate, "init": cmd_init, "map": cmd_map, "refs": cmd_refs, "sun": cmd_sun,
         "camera": cmd_camera, "assets": cmd_assets, "build": cmd_build, "render": cmd_render, "compare": cmd_compare,
         "log": cmd_log, "film": cmd_film, "web": cmd_web, "shot": cmd_shot, "gpu": cmd_gpu}
 

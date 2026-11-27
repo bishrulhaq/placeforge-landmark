@@ -73,6 +73,15 @@ def main():
         info = lm.build(mp) or {}
         H = float(info.get("height", H) or H)
         pf.LANDMARK = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
+    nbp = os.path.join(pf.PROJECT, "neighbours.py")
+    if os.path.exists(nbp):                        # the named buildings nearby, modelled by hand like the landmark
+        spec = importlib.util.spec_from_file_location("neighbours", nbp)
+        nbm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nbm)
+        before = set(bpy.data.objects)
+        nbm.build(mp)
+        pf.NEIGHBOURS = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
+        pf.log("neighbours: %d hand-modelled object(s)" % len(pf.NEIGHBOURS))
     if H <= 0:                                    # no model, no stated height: the tallest mapped thing at the pin
         H = max([b.get("h", 0) or 0 for b in mp.buildings if city.inside(b["p"], 0.0, 0.0)] + [30.0])
     rng = random.Random(7)

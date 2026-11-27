@@ -50,6 +50,7 @@ PROJECT = ""
 TIMED = []          # (socket, f(t seconds)): shader values the film sets every frame
 HELI = None         # the helicopter's orbit once the life is built (heli_orbit); the film camera follows it
 LANDMARK = []       # the landmark's mesh objects (pf_scene fills it): flight paths keep clear of them
+NEIGHBOURS = []     # hand-modelled neighbours (neighbours.py): obstacles too
 
 
 def heli_orbit(H, tops=()):
@@ -78,6 +79,12 @@ def heli_orbit(H, tops=()):
         r = reach + clear
     # the buildings under and beside the track
     top = max([t for x, y, m, t in tops if abs(math.hypot(x, y) - r) < m + clear] + [0.0])
+    for o in NEIGHBOURS:                           # hand-modelled neighbours are not in `tops`
+        mw = o.matrix_world
+        for vtx in o.data.vertices:
+            p = mw @ vtx.co
+            if p.z > top and abs(math.hypot(p.x, p.y) - r) < clear:
+                top = p.z
     if z < top + clear:
         z = top + clear
     if (r, z) != (r0, z0):

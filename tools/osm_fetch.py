@@ -195,7 +195,7 @@ def convert(d, lat0, lon0, radius, far=False):
             v = num(t.get(a))
             if v:
                 b[k] = v
-        for a, k in (("name", "name"), ("roof:shape", "roof"), ("building:material", "mat"), ("building:colour", "col"),
+        for a, k in (("name", "name"), ("name:en", "name_en"), ("roof:shape", "roof"), ("building:material", "mat"), ("building:colour", "col"),
                      ("roof:colour", "roofcol"), ("amenity", "am"), ("man_made", "mm"), ("tourism", "tourism")):
             if t.get(a):
                 b[k] = t[a]

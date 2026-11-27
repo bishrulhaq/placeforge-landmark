@@ -572,8 +572,30 @@ def height_of(b, rng, ar):
     return FL * rng.randint(max(1, lo), hi + (1 if ar > 900 else 0))
 
 
+def neighbour_rule(b, cx, cy, rules):
+    """The place.json "neighbours" entry for this mapped building, or None. An entry names a building the way a
+    visitor would ("match": part of its name or English name, any case) or points at it ("at": [x, y] inside its
+    footprint, or within "r" metres of its centre)."""
+    nm = ((b.get("name") or "") + " | " + (b.get("name_en") or "")).lower()
+    for r in rules:
+        if "part" in r and bool(r["part"]) != bool(b.get("part")):      # "part": true = only a mapped 3D part, false = only an outline
+            continue
+        m = (r.get("match") or "").lower()
+        if m and m in nm:
+            return r
+        if r.get("at"):
+            x, y = r["at"]
+            if inside(b["p"], x, y) or math.hypot(cx - x, cy - y) <= float(r.get("r", 0)):
+                return r
+    return None
+
+
 def osm_buildings(mp, B, rng):
-    """Every mapped footprint, at its mapped height where the map knows it, in the region's colours otherwise."""
+    """Every mapped footprint, at its mapped height where the map knows it, in the region's colours otherwise.
+    place.json "neighbours" overrides single buildings: height_m, walls, roof (linear RGB), glass (0 or 1), or
+    drop (true: neighbours.py models it by hand)."""
+    rules = cfg("neighbours", []) or []
+    used = set()
     walls, flat, pitched = cfg("region.walls"), cfg("region.roofs_flat"), cfg("region.roofs_pitched")
     share, gshare = float(cfg("region.pitched_share", 0.35)), float(cfg("region.glass_share", 0.5))
     names = [n.lower() for n in cfg("landmark.remove_names", [])]
@@ -585,7 +607,14 @@ def osm_buildings(mp, B, rng):
             continue
         r = random.Random(int(cx * 7.31 + cy * 13.7) & 0xffffff)
         ar = abs(area(p))
+        nb = neighbour_rule(b, cx, cy, rules) if rules else None
+        if nb is not None:
+            used.add(id(nb))
+            if nb.get("drop"):
+                continue
         h = height_of(b, r, ar)
+        if nb and nb.get("height_m") and not b.get("part"):
+            h = float(nb["height_m"])
         z0 = min(float(b.get("minh", 0.0)), h - 1.0)
         wall = colour(b.get("col")) or jitter(r, pick(r, walls))
         rnd = r.uniform(0.06, 1.0)
@@ -593,6 +622,13 @@ def osm_buildings(mp, B, rng):
             rnd = 0.02
             wall = jitter(r, r.choice(((0.45, 0.47, 0.48), (0.36, 0.40, 0.44), (0.50, 0.46, 0.38), (0.30, 0.36, 0.40))))
         glass = 1.0 if (h > 38 and r.random() < gshare) or b.get("mat") == "glass" else 0.0
+        if nb:
+            if nb.get("walls"):
+                wall = tuple(nb["walls"])
+            if "glass" in nb:
+                glass = float(nb["glass"])
+            if nb.get("roof"):
+                b = dict(b, roofcol=None, _roof=tuple(nb["roof"]))
         ox, oy, w, d, rot = obb(p)
         boxy = ar / max(w * d, 1e-6) > 0.84 and len(p) <= 8
         shape = b.get("roof")
@@ -601,13 +637,16 @@ def osm_buildings(mp, B, rng):
         if want_pitch and boxy and z0 == 0:
             B.box(ox, oy, w, d, h, rot, wall, colour(b.get("roofcol")) or jitter(r, pick(r, pitched)), 0.0, rnd, pitch=0.3 if min(w, d) < 14 else 0.18)
         else:
-            roofc = colour(b.get("roofcol")) or jitter(r, pick(r, flat))
+            roofc = b.get("_roof") or colour(b.get("roofcol")) or jitter(r, pick(r, flat))
             if b["k"] in SHED:
                 roofc = jitter(r, r.choice(((0.42, 0.44, 0.45), (0.30, 0.32, 0.34), (0.36, 0.22, 0.16))))
             B.poly(p, h - z0, wall, roofc, glass, rnd, z0=z0)
             if rnd > 0.05 and not glass and ar > 45 and not b.get("part"):
                 roof_clutter(B, r, p, h, wall, ar > 500)
         n += 1
+    for nb in rules:
+        if id(nb) not in used:
+            pf.log("neighbours: no mapped building matches", nb.get("match") or nb.get("at"), "(see: pf neighbours)")
     return n
 
 

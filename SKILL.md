@@ -21,6 +21,7 @@ What is generated and what is not:
 | Streets, building footprints and heights, water, coast, railways, parks, mapped trees | OpenStreetMap inside the radius, as mapped (`pf map`) |
 | Unmapped streets, and the land out to the horizon | The generator, by the region's rules in `place.json` |
 | The landmark itself | **You model it** in `P/landmark.py` from the photos. This is the craft; the loop is how it gets good |
+| The named buildings round it | The map's outline and height; their look is looked up and overridden, or modelled in `P/neighbours.py`, when the user wants the neighbourhood real (section 5b) |
 | Cars, vans, buses, people, trains, a helicopter | Downloaded CC0 models (`pf assets`). Never hand-built boxes: no model, no object. In the film and in the Three.js page they move the same way |
 
 ## Rules
@@ -58,6 +59,12 @@ Ask only for what is missing. Use one round of questions.
   1,000 for a landmark in its district (default 800), 1,500+ only if the photo's foreground needs it.
 - **Outputs**: still, interactive page, film. For a film: how many seconds, 16:9 or 9:16, which times of day,
   music or not.
+- **The neighbours**: how real must the buildings round the landmark be? After the map is in, show the user the list from
+  `pf neighbours P` and ask, with three choices: *as mapped* (the map's outlines, generic walls; fine for a distant view),
+  *true heights and colours* (each named neighbour looked up and overridden; recommended), or *modelled* (the named
+  ones built by hand like the landmark; needed when the camera goes to street level or close past them). Say what
+  each costs: a few minutes of research per building for the second, an hour or more of modelling and render loops
+  for the third. If they say yes to either, section 5b is not optional.
 - **Where to render**: this machine (GPU or CPU), a rented Vast.ai GPU (they add `VAST_API_KEY` to `P/.env`), or
   an SSH machine they already have. `pf doctor` reports what this machine can do. A film on a CPU takes hours to
   days; say so and recommend renting for films.
@@ -152,6 +159,36 @@ pf build P                  # ends with "pf: BUILD OK"
 pf web P && pf shot P hero  # a quick look in the Three.js viewer: shapes, placement, the map. Not the final look
 ```
 
+## 5b. The neighbours
+
+A landmark between generic blocks reads as a model, however good the landmark is. People who know the place check
+the mall, the hotel and the opera house next to it before they look at anything else.
+
+```bash
+pf neighbours P                 # the notable buildings round the pin, most prominent first -> map/neighbours.md
+```
+
+1. **List.** Read the table. "Height **not mapped**" means the engine guesses a height. Add by hand what the table
+   misses: a low but famous building (a souk, a temple, a market) scores low and may carry only a local-script name.
+2. **Ask** the user which level they want (see Intake), unless they already said. Do not decide for them that the
+   neighbours do not matter.
+3. **Research each one** the user wants real: height and floors, plan shape, facade material and colour, the crown,
+   the one feature that makes it recognisable from 500 m, how it is lit at night. Published facts first; photos for
+   the look (`pf photos P --query "<its name>"`, then the contact sheet). Note the source beside each number.
+4. **Override** what the map has right in outline but wrong in look, in `place.json`:
+   `"neighbours": [{"match": "Address Downtown", "height_m": 306, "walls": [0.55, 0.52, 0.46], "glass": 1, "roof": [0.4, 0.4, 0.4]}]`.
+   `match` is part of the building's name or English name; `"at": [x, y]` points at an unnamed one (x, y from the
+   table). Colours are linear RGB. The build log names any entry that matched nothing.
+5. **Model by hand** the ones the camera comes close to, in `P/neighbours.py`: `build(mp)` as in `landmark.py`, each
+   building at its mapped place (take the outline from `map/osm.json`, as the landmark does when the map has it).
+   Give its mapped stand-in `"drop": true` in `place.json` `neighbours`, so the two do not stand inside each other.
+   What you build here travels to the web viewer and is kept clear of by the helicopter, like the landmark.
+6. **Check each** with its own view in `place.json` `views` (looking at the neighbour, not at the landmark) in
+   Cycles and in the viewer, then once more in the wide view. Add each neighbour as a row of the detail pass table.
+
+The order of worth: the two or three a local would name, then whatever stands between the camera and the
+landmark in the delivered views, then the tall ones on the skyline. Stop where the delivered views stop seeing.
+
 ## 6. The recursive perfection loop
 
 This is the heart of the skill. One loop:
@@ -196,9 +233,8 @@ photo to full size and write a table in `renders/LOOPS.md`: one row per small th
   signs. Count repeated things on the photo; do not guess the number.
 - **At its foot:** paving patterns, kerbs, planters, palms or trees in rows, flag poles, bollards, lamp posts, benches,
   fountains and their nozzles, pools, bridges, boats, the edge detail where land meets water.
-- **Round it:** the two or three neighbours a local would name (a mall, a hotel, an opera house). The map gives the
-  outline; give each its real height, colour and one recognisable feature. Check how the map stores them: a
-  building mapped under another tag can be missing altogether.
+- **Round it:** the neighbours, at the level the user chose (section 5b). Check how the map stores them: a building
+  mapped under another tag can be missing altogether.
 - **At night:** aviation lights (red, steady or blinking) on every tall thing, strobes, the landmark's own lighting
   scheme as it is on an ordinary night, lit entrances, lamps along the water.
 - **In motion (film and viewer):** whatever moves in the real place and is missing here, as long as it can move

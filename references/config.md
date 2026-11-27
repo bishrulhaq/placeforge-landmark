@@ -35,6 +35,7 @@ Positions are metres east, north, up from the pin. Bearings are compass degrees 
 | `region.trees` | Mix of `broad`, `round`, `tall`, `palm`, `conifer`. `region.tree_density`: multiplier |
 | `region.ground` | `[dark, light]`: bare land, when the default earth and worn grass is wrong (desert cities: sand) |
 | `region.water`, `region.sea` | Body colours. `region.shore`: `soft` or `wall`. `region.wind_bearing` |
+| `neighbours` | A list of overrides for single mapped buildings: `{"match": "part of its name"}` or `{"at": [x, y], "r": 0}`, optionally `"part": true` or `false` (only a mapped 3D part, or only an outline, when both carry the name), then any of `height_m`, `walls` and `roof` (linear RGB), `glass` (0 or 1), `drop` (true: `neighbours.py` models it by hand). `pf neighbours P` lists the candidates |
 | `infill.density` | `"auto"`, 0 (off) to 1: lots along streets the map shows without buildings |
 | `infill.lot_m`, `infill.floors` | Lot size range and floors of generated buildings |
 | `far.urban`, `far.trees` | Density of the generated far ring |
