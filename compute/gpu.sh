@@ -116,7 +116,7 @@ up)
   if [ ! -f "$SSHKEY" ]; then mkdir -p "$(dirname "$SSHKEY")"; ssh-keygen -q -t ed25519 -N "" -C placeforge -f "$SSHKEY"; fi
   cli create ssh-key "$(cat "$SSHKEY.pub")" >/dev/null 2>&1 || true        # registers the key on the account (no-op if it is there)
   gpus="${*:-RTX_5090 RTX_4090}"; gl=$(echo $gpus | tr ' ' ',')
-  bad=$(grep -E '^[0-9]+$' "$PROJ/.pf/bad-machines" 2>/dev/null | tr '\n' ',' | sed 's/,$//'); xq=""; [ -n "$bad" ] && xq=" machine_id notin [$bad]"
+  bad=$({ grep -E '^[0-9]+$' "$PROJ/.pf/bad-machines" 2>/dev/null || true; } | tr '\n' ',' | sed 's/,$//'); xq=""; [ -n "$bad" ] && xq=" machine_id notin [$bad]"
   ng="$(envget VAST_NOT_GEO)"; [ -n "$ng" ] && xq="$xq geolocation notin [$ng]"
   pick=$(cli search offers "num_gpus=1 dph_total<$MAXP reliability>0.98 verified=true rentable=true inet_down>300 cpu_ram>=16 disk_space>=40 gpu_name in [$gl]$xq" -o dph_total --raw 2>/dev/null | python3 -I -c '
 import json,sys
