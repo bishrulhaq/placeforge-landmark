@@ -269,7 +269,12 @@ def sea_polygons(coast, R):
             i = best
         if len(poly) >= 3:
             polys.append(poly)
-    return polys, islands
+    # the pin stands on land. A stretch of coast that stops short inside the circle (a canal bank mapped as coast, a
+    # gap in the data) closes round the wrong side, and that "sea" swallows the whole place: drop it.
+    dry = [p for p in polys if not inside(p, 0.0, 0.0)]
+    if len(dry) < len(polys):
+        pf.log("sea: dropped %d coast polygon(s) that covered the pin (open coast stretch inside the far radius)" % (len(polys) - len(dry)))
+    return dry, islands
 
 
 class Map:
@@ -283,6 +288,7 @@ class Map:
         self.FR = max(self.R, min(8000.0, max(3000.0, 4 * self.R)) if fr in ("auto", None) else float(fr))
         far = d.get("far") or {}
         self.has_far = bool(far)
+        self.far_buildings = far.get("buildings") or []      # mapped buildings beyond the radius: [x, y, w, d, angle, h, levels(, footprint)]
         tp = lambda p: [(float(x), float(y)) for x, y in p]
         self.buildings = []
         for b in d["buildings"]:
@@ -517,6 +523,24 @@ def roof_clutter(B, rng, pts, h, wall, big):
             spots.append((x, y))
     rot = rng.uniform(0, math.pi)
     tanks = float(cfg("region.roof_tanks", 0.0))
+    ar = abs(area(pts))
+    if ar > 2500:                 # a hall, a mall, a depot: rows of plant and skylights, not three boxes on a bare slab
+        cell = 16.0 if ar < 20000 else 26.0
+        rot = obb(pts)[4]
+        nx, ny = int((max(xs) - min(xs)) / cell), int((max(ys) - min(ys)) / cell)
+        for i in range(nx):
+            for j in range(ny):
+                x, y = min(xs) + (i + 0.5 + rng.uniform(-0.2, 0.2)) * cell, min(ys) + (j + 0.5 + rng.uniform(-0.2, 0.2)) * cell
+                u = rng.random()
+                if u > 0.55 or not inside(pts, x, y) or not all(inside(pts, x + dx, y + dy) for dx, dy in ((5, 5), (-5, 5), (5, -5), (-5, -5))):
+                    continue
+                if u < 0.14:      # a skylight strip
+                    B.box(x, y, rng.uniform(6, 11), 2.2, 0.9, rot, (0.55, 0.57, 0.58), (0.22, 0.30, 0.36), 0.0, 0.01, z0=h)
+                elif u < 0.40:    # an air handling unit
+                    B.box(x, y, rng.uniform(2.5, 5.5), rng.uniform(1.8, 2.6), rng.uniform(1.4, 2.4), rot, (0.56, 0.57, 0.58), (0.5, 0.5, 0.5), 0.0, 0.01, z0=h)
+                else:             # a stair or lift room
+                    B.box(x, y, rng.uniform(3.5, 6.0), rng.uniform(3.0, 5.0), rng.uniform(2.6, 3.4), rot, wall, (0.34, 0.34, 0.33), 0.0, 0.01, z0=h)
+        return
     for x, y in spots[:(3 if big else 1)]:
         r = rng.random()
         if r < tanks:
@@ -526,6 +550,45 @@ def roof_clutter(B, rng, pts, h, wall, big):
             B.box(x, y, 3.2, 3.6, 2.8, rot, wall, (0.3, 0.3, 0.28), 0.0, 0.01, z0=h)
         elif big:
             B.box(x, y, 2.4, 1.6, 1.3, rot, (0.55, 0.56, 0.57), (0.5, 0.5, 0.5), 0.0, 0.01, z0=h)
+
+
+def shrink(pts, k):
+    cx, cy = centroid(pts)
+    return [(cx + (x - cx) * k, cy + (y - cy) * k) for x, y in pts]
+
+
+def tower(B, rng, pts, h, wall, roofc, glass, rnd, z0=0.0, mast=True):
+    """A tall building, crown included, to the height h. A footprint pulled straight up to a flat lid is the mark of
+    a generated city: real towers step in for a plant floor, carry a screen wall round the cooling towers, a lift
+    overrun, a mast. The crown is taken out of h, so a mapped height stays true. False = too small or low for one
+    (the caller draws the plain block)."""
+    ar = abs(area(pts))
+    if h - z0 < 45 or ar < 250 or len(pts) > 40 or cfg("region.tower_tops", True) in (False, 0, "off"):
+        return False
+    ox, oy, w, d, rot = obb(pts)
+    kind = rng.random()
+    steps = []                                        # (footprint scale, height, colours, glass, rnd)
+    if kind < 0.45:                                   # a stepped crown: one or two set-backs
+        steps = [(k, dh, wall, roofc, glass, rnd) for k, dh in ((0.84, rng.uniform(4.0, 9.0)), (0.62, rng.uniform(3.5, 8.0)))[:rng.choice((1, 2, 2))]]
+    elif kind < 0.8:                                  # a plant room inside a screen wall (the wall is the body's last floors)
+        steps = [(0.5, rng.uniform(2.5, 4.5), (0.42, 0.43, 0.44), (0.36, 0.36, 0.36), 0.0, 0.01)]
+    else:                                             # a plain plant room and lift overrun
+        steps = [(0.55, rng.uniform(3.5, 6.0), jitter(rng, (0.5, 0.5, 0.5)), (0.36, 0.36, 0.36), 0.0, 0.01)]
+    body = h - sum(s_[1] for s_ in steps)
+    B.poly(pts, body - z0, wall, roofc, glass, rnd, z0=z0)
+    if 0.45 <= kind < 0.8 and ar / max(w * d, 1e-6) > 0.8:      # the screen wall: a parapet 2 to 4 m tall round the lid
+        t, ph = max(0.5, min(w, d) * 0.03), min(steps[0][1], rng.uniform(2.0, 4.0))
+        c, s_ = math.cos(rot), math.sin(rot)
+        for ax, ay, sw, sd in ((0, d / 2 - t / 2, w, t), (0, -d / 2 + t / 2, w, t), (w / 2 - t / 2, 0, t, d), (-w / 2 + t / 2, 0, t, d)):
+            B.box(ox + ax * c - ay * s_, oy + ax * s_ + ay * c, sw, sd, ph, rot, wall, wall, glass, rnd, z0=body)
+    z = body
+    for k, dh, wc, rc, gl, rn in steps:
+        B.poly(shrink(pts, k), dh, wc, rc, gl, rn, z0=z)
+        z += dh
+    if mast and h > 110 and rng.random() < 0.45:      # a mast on the tallest (not when the height is mapped: it would overshoot)
+        cx, cy = centroid(pts)
+        B.box(cx, cy, 1.2, 1.2, rng.uniform(0.06, 0.16) * h, rng.uniform(0, 1.5), (0.6, 0.6, 0.62), (0.6, 0.6, 0.62), 0.0, 0.01, z0=z)
+    return True
 
 
 def lot(B, rng, px, py, w, d, h, rot, wall, roofc, rnd, flat=True):
@@ -640,7 +703,9 @@ def osm_buildings(mp, B, rng):
             roofc = b.get("_roof") or colour(b.get("roofcol")) or jitter(r, pick(r, flat))
             if b["k"] in SHED:
                 roofc = jitter(r, r.choice(((0.42, 0.44, 0.45), (0.30, 0.32, 0.34), (0.36, 0.22, 0.16))))
-            B.poly(p, h - z0, wall, roofc, glass, rnd, z0=z0)
+            mapped_h = bool(b.get("h") or (nb and nb.get("height_m")))
+            if b.get("part") or (nb and nb.get("plain")) or not tower(B, r, p, h, wall, roofc, glass, rnd, z0=z0, mast=not mapped_h):
+                B.poly(p, h - z0, wall, roofc, glass, rnd, z0=z0)
             if rnd > 0.05 and not glass and ar > 45 and not b.get("part"):
                 roof_clutter(B, r, p, h, wall, ar > 500)
         n += 1
@@ -711,6 +776,36 @@ def far_city(mp, B, trees, rng):
     lo, hi = cfg("region.default_floors", [1, 4])
     use_lu = mp.has_far and any(a["far"] and a["k"] in ("residential", "commercial", "industrial") for a in mp.areas)
     n = 0
+    if len(mp.far_buildings) >= int(cfg("far.mapped_min", 400)):
+        # the map knows the far city building by building: place those, at their mapped heights. The real skyline
+        # (where the towers stand, where the low houses are, where there is nothing) is what a generated ring cannot give.
+        gshare = float(cfg("region.glass_share", 0.5))
+        lim = mp.FR ** 2
+        for fb in mp.far_buildings:
+            x, y, w, d, rot, h, lv = fb[:7]
+            if x * x + y * y > lim or mp.bld_dist(x, y) < 8.0:
+                continue
+            r = random.Random(int(x * 7.31 + y * 13.7) & 0xffffff)
+            ar = w * d
+            if not h:
+                h = lv * FL + 0.4 if lv else (FL * r.choice((1, 1, 2)) + 0.3 if ar < 500 else FL * r.randint(max(1, lo), max(2, hi - 2)) + 0.3)
+            wallc, roofc, rnd = jitter(r, pick(r, walls)), jitter(r, pick(r, flat)), r.uniform(0.06, 1.0)
+            glass = 1.0 if h > 38 and r.random() < gshare else 0.0
+            if len(fb) > 7:
+                p = [(fb[7][i], fb[7][i + 1]) for i in range(0, len(fb[7]), 2)]
+                if area(p) < 0:
+                    p.reverse()
+                if not tower(B, r, p, h, wallc, roofc, glass, rnd, mast=False):
+                    B.poly(p, h, wallc, roofc, glass, rnd)
+            else:
+                if ar > 1500 and h < 12 and r.random() < 0.5:
+                    rnd = 0.02                                   # a big low block: a shed, a hall
+                B.box(x, y, w, d, h, rot, wallc, roofc, glass, rnd)
+            n += 1
+            if ar < 700 and r.random() < 0.35 * tk:
+                trees.append(tree_at(r, x + r.uniform(-1, 1) * (w / 2 + 3), y + r.uniform(-1, 1) * (d / 2 + 3), 1.1))
+        pf.log("far city: %d mapped buildings placed (no generated ring)" % n)
+        return n
     ring = mp.R
     while ring < mp.FR:
         cell = 26.0 + 60.0 * (ring - mp.R) / max(mp.FR - mp.R, 1.0)

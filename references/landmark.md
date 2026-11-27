@@ -45,6 +45,7 @@ turned to true north at the end (see `TURN` in the Lotus example).
 | `pf.new_mat` + `pf.nd / M / mix / ramp / noise_t ...` | Your own node shader (panel joints, cladding, LED lattices) |
 | `pf.add_emission(mat, colour, strength)` | Night lighting. `pf.tod()` is `day`, `sunset` or `night` |
 | `pf.time_value(nt, lambda t: ...)` | A value the film drives each frame (LED shows, beacons) |
+| `pf.jet(obj, x, y, z, height, phase, burst)` | One fountain jet: a unit-height object the film stretches each frame (`obj` = None in the web export: the page draws the jet from the numbers). Film and page run the same show (`pf.jet_k`) |
 | `pf.viewer_color(mat, colour, rough, metal)` | The average colour a node-driven material shows in the Three.js page |
 | `pf.viewer_emission(mat, colour, strength)` | Its night glow in the Three.js page |
 | `pf.viewer_facade(mat, floor, panel, sill, fin, spandrel, fin_color, vary, lit, lit_color)` | The floors, mullions and lit rooms of a curtain wall in the Three.js page, drawn there from world position. `look.mat_glass` sets it itself |

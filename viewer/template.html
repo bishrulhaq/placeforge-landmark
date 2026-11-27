@@ -84,7 +84,7 @@ const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 1.5, 12
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI * 0.5 - 0.01;
+controls.maxPolarAngle = Math.PI - 0.06;      // a camera at street level must be able to look up at a tower; the loop keeps it above the ground
 controls.minDistance = 8;
 controls.maxDistance = Math.max(FAR * 1.2, 4000);
 const lin = (c) => new THREE.Color().setRGB(c[0], c[1], c[2]);
@@ -168,6 +168,9 @@ async function load() {
   return { buf, boxes: chunk(META.chunks.boxes), polys: chunk(META.chunks.polys), trees: chunk(META.chunks.trees), lamps: chunk(META.chunks.lamps) };
 }
 
+// tower glass tints, the same list as GLASS_TINTS in engine/pf_look.py
+const TINT_GLSL = `vec3 pfTint(int i) { if (i <= 0) return vec3(0.42, 0.56, 0.72); if (i == 1) return vec3(0.30, 0.48, 0.50); if (i == 2) return vec3(0.62, 0.66, 0.70);
+  if (i == 3) return vec3(0.20, 0.26, 0.32); if (i == 4) return vec3(0.50, 0.40, 0.26); return vec3(0.36, 0.52, 0.66); }\n`;
 function worldVaryings(sh, extraV = '', extraF = '') {
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW; varying vec3 vNw;' + extraV)
     .replace('#include <project_vertex>', `#include <project_vertex>
@@ -228,7 +231,7 @@ function buildCity(D) {
   g.computeVertexNormals();
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
   m.onBeforeCompile = sh => { sh.uniforms.uNight = nightU;
-    worldVaryings(sh, 'attribute vec3 aAtt; varying vec3 vAtt;', 'varying vec3 vAtt; uniform float uNight; float pfWin; vec3 pfLit;');
+    worldVaryings(sh, 'attribute vec3 aAtt; varying vec3 vAtt;', 'varying vec3 vAtt; uniform float uNight; float pfWin, pfCw, pfMetal, pfRough; vec3 pfLit;\n' + TINT_GLSL);
     sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvAtt = aAtt;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       { vec3 P = vec3(vW.x, -vW.z, vW.y), N = normalize(vec3(vNw.x, -vNw.z, vNw.y));
@@ -239,8 +242,10 @@ function buildCity(D) {
         float fz = fract(P.z / FLh + rnd * 0.7), fh = fract(hc / 3.4 + rnd * 13.7);
         float ww = 0.08 + fract(rnd * 7.3) * 0.16, wtop = 0.82 + fract(rnd * 3.1) * 0.1;
         float win = step(0.30, fz) * step(fz, wtop) * step(ww, fh) * step(fh, 1.0 - ww) * step(2.8, P.z);
-        float mull = step(0.07, fract(hc / 1.6)) * step(0.1, fract(P.z / (FLh + 0.4)));
-        win = mix(win, mull, glass) * wall * step(0.05, rnd) * (1.0 - roof);
+        float gu = hc / 1.5 + rnd * 3.3, gh = fract(gu), gz = fract(P.z / FLh), style = fract(rnd * 11.13);
+        float sp = step(gz, 0.18 + 0.2 * fract(rnd * 2.9)), mv = step(gh, 0.035 + 0.05 * step(0.7, style)), ribbon = step(style, 0.35);
+        float cw = glass * wall * step(0.05, rnd) * (1.0 - roof);
+        win = mix(win, (1.0 - sp) * (1.0 - mv), glass) * wall * step(0.05, rnd) * (1.0 - roof);
         float dist = distance(vW, cameraPosition);
         float lod = 1.0 - smoothstep(700.0, 2600.0, dist);
         vec3 cellv = vec3(floor(hc / 3.4), floor(P.z / FLh), rnd * 97.0);
@@ -253,11 +258,23 @@ function buildCity(D) {
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.68, shed * step(fract(hc / 0.9), 0.1) * wall * lod);
         vec3 gc = mix(vec3(0.05, 0.06, 0.065), vec3(0.16, 0.18, 0.19), cr);
         diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.8, gc, lod), win);
+        // curtain walls: a tinted mirror, one tint per tower; spandrel bands, mullions, a few blinds (as pf_look.mat_buildings)
+        float tq = fract(rnd * 5.71) * 5.0;
+        vec3 tint = mix(pfTint(int(tq)), pfTint(int(tq) + 1), fract(tq));
+        float pr = hash3(vec3(floor(gu), floor(P.z / FLh), rnd * 97.0 + 31.0));
+        vec3 pane = mix(tint * mix(0.82, 1.12, pr), vec3(0.62, 0.61, 0.57), step(0.88, pr) * 0.4);
+        vec3 spc = mix(tint * 0.5, mix(vColor.rgb, vec3(0.66, 0.66, 0.64), 0.5), ribbon);
+        vec3 cwc = mix(mix(pane, spc, sp), mix(tint * 0.6, vec3(0.50, 0.52, 0.55), 0.5), mv);
+        diffuseColor.rgb = mix(diffuseColor.rgb, mix(tint * 0.8, cwc, lod), cw);
+        pfCw = cw; pfMetal = mix(0.7, max((0.85 - sp * (0.15 + ribbon * 0.7)) * (1.0 - mv), mv * 0.9), lod);
+        pfRough = mix(0.1, max(0.03 + pr * 0.04 + step(0.88, pr) * 0.25 + sp * (0.10 + ribbon * 0.45), mv * 0.35), lod);
         pfWin = win * lod;
-        float lit = step(0.74, hash3(cellv + vec3(0.0, 0.0, 13.0)));
-        vec3 lc = mix(vec3(1.0, 0.62, 0.30), vec3(0.75, 0.86, 1.0), step(0.9, hash3(cellv + 5.0)));
-        pfLit = lc * win * lit * uNight * mix(0.35, 1.6, lod); }`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.08, pfWin);')
+        float lit = step(0.70 + 0.27 * fract(rnd * 23.7), hash3(cellv + vec3(0.0, 0.0, 13.0)));
+        vec3 lc = mix(vec3(1.0, 0.60, 0.28), vec3(0.75, 0.86, 1.0), step(0.9, hash3(cellv + 5.0)));
+        float floorOn = glass * step(0.91, hash3(vec3(7.0, floor(P.z / FLh), rnd * 53.0))) * (1.0 - lit);
+        pfLit = (lc * lit * mix(0.18, 1.0, hash3(cellv + 9.0)) * 0.9 + vec3(0.80, 0.90, 1.0) * floorOn * 0.22) * win * uNight * mix(0.4, 1.2, lod); }`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(mix(roughnessFactor, 0.08, pfWin), pfRough, pfCw);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, pfMetal, pfCw);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += pfLit;'); };
   const mesh = new THREE.Mesh(g, m);
   mesh.castShadow = mesh.receiveShadow = true;
@@ -486,6 +503,13 @@ function buildLife(buf) {
     const root = new THREE.Group(), mk = (c) => { const m = new THREE.Mesh(soupGeo(buf, c), paint); m.castShadow = true; root.add(m); return m; };
     mk(Hh.soups[0]); const main = mk(Hh.soups[1]), tail = mk(Hh.soups[2]);
     main.position.fromArray(Hh.main_hub); tail.position.fromArray(Hh.tail_hub);
+    if (Hh.main_r) {     // blades as a camera sees them: a smeared disc (engine/pf_life.py rotor_disc)
+      const dm = new THREE.MeshBasicMaterial({ color: 0x0a0a0c, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
+      main.add(new THREE.Mesh(new THREE.RingGeometry(Hh.main_r * 0.07, Hh.main_r, 40), dm));
+      const td = new THREE.Mesh(new THREE.RingGeometry(Hh.tail_r * 0.07, Hh.tail_r, 24), dm);
+      if (Hh.tail_axis === 0) td.rotation.y = Math.PI / 2; else if (Hh.tail_axis === 1) td.rotation.x = Math.PI / 2;
+      tail.add(td);
+    }
     root.rotation.order = 'ZYX';
     ZUP.add(root);
     window.__heli = root;
@@ -498,6 +522,21 @@ function buildLife(buf) {
       tail.rotation.set(0, 0, 0); tail.rotation['xyz'[Hh.tail_axis]] = t * 6.2832 * Hh.tail_rps; });
   }
   return { cars: nc, parked: K.length / 4, walkers: nw, trains: Tn.length / 4, heli: !!Hh };
+}
+
+// fountain jets: the same show as the film (engine/pf_core.py jet_k): a wave along the nozzles, big shooters in bursts
+function buildJets(J) {
+  if (!J || !J.length) return 0;
+  const g = new THREE.CylinderGeometry(0.10, 0.34, 1, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.5);
+  const m = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide, fog: true });
+  const im = new THREE.InstancedMesh(g, m, J.length); im.frustumCulled = false; ZUP.add(im);
+  const o = new THREE.Object3D();
+  tick.push(t => { J.forEach(([x, y, z, h, ph, burst], i) => { let k;
+      if (burst) { const c = (t + 2) % 12; k = c < 4 ? Math.pow(Math.sin(Math.PI * c / 4), 0.6) : 0; } else k = 0.30 + 0.70 * Math.abs(Math.sin(0.9 * t - ph));
+      const sz = Math.max(h * k, 0.01), w = 1 + sz * 0.035;
+      o.position.set(x, y, z); o.scale.set(w, w, sz); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+    im.instanceMatrix.needsUpdate = true; m.color.setRGB(0.95 - 0.35 * nightU.value, 0.97 - 0.42 * nightU.value, 1.0 - 0.55 * nightU.value); });
+  return J.length;
 }
 
 // ------------------------------------------------------------------ views
@@ -536,6 +575,7 @@ buildGround();
 const stats = { cityVerts: buildCity(D), trees: buildTrees(D.trees), tris: buildMeshes(D.buf) };
 buildLamps(D.lamps);
 if (META.life) stats.life = buildLife(D.buf);
+stats.jets = buildJets(META.jets);
 nightHooks.push(nf => { for (const [m, c] of waterMats) m.color.copy(c).multiplyScalar(0.1 + 0.9 * (1 - nf)); });
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -562,6 +602,7 @@ renderer.setAnimationLoop(() => {
   for (const f of tick) f(timeU.value + T0);
   if (follow) chase();
   controls.update();
+  if (camera.position.y < 1.5) camera.position.y = 1.5;
   sun.target.position.copy(controls.target);
   sun.position.copy(controls.target).addScaledVector(sunDirW, 4000);
   sky.position.copy(camera.position);

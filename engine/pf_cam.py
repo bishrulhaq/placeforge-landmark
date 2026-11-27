@@ -87,6 +87,12 @@ def camera(sc, mp, H):
         v = vs[name]
         c.lens = float(v.get("lens", 35))
         aim(o, v["from"], v["to"])
+        if v.get("level"):
+            # a level camera with the lens shifted up, as an architecture photographer shoots: verticals stay
+            # vertical. Tilting a wide lens up at a tower makes every building lean, the mark of a quick snapshot.
+            dx, dy, dz = (v["to"][i] - v["from"][i] for i in range(3))
+            o.rotation_euler = (math.radians(90), 0, -math.atan2(dx, dy))
+            c.shift_y = max(-0.6, min(0.6, c.lens * dz / max(math.hypot(dx, dy), 1e-6) / c.sensor_width))
     else:
         raise SystemExit("pf: no view '%s'. Views here: %s" % (name, ", ".join(["photo"] * bool(pose) + list(vs))))
     pf.log("view:", name, "lens %.0f mm" % c.lens, "at", tuple(round(x, 1) for x in o.location))

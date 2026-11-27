@@ -98,7 +98,9 @@ def world(sc):
     t = pf.tod()
     lp = nd(nt, "ShaderNodeLightPath")
     if t == "night":
-        ng = ramp(nt, dz, [(0.0, (0.060, 0.042, 0.035)), (0.05, (0.028, 0.030, 0.045)), (0.3, (0.008, 0.012, 0.030)), (1.0, (0.003, 0.005, 0.016))])
+        gk = float(cfg("look.night_glow", 1.0))       # a big city under haze lights its own sky: 2 to 3 for one
+        ng = ramp(nt, dz, [(0.0, tuple(c * gk for c in (0.060, 0.042, 0.035))), (0.10, tuple(c * gk for c in (0.030, 0.028, 0.040))),
+                           (0.35, tuple(c * (0.5 + 0.5 * gk) for c in (0.010, 0.013, 0.030))), (1.0, (0.003, 0.005, 0.016))])
         st = nd(nt, "ShaderNodeTexVoronoi", {"Scale": 420.0, "Randomness": 1.0})
         nt.links.new(d, st.inputs["Vector"])
         wn = nd(nt, "ShaderNodeTexWhiteNoise", noise_dimensions="3D")
@@ -124,7 +126,9 @@ def world(sc):
         sk, sl = float(cfg("look.sky_camera", 0.85)), float(cfg("look.sky_light", 0.5))
         if cfg("look.sky") != "gradient":
             sk, sl = sk * 0.35, sl * 0.35           # the physical sky is far brighter than a hand-set gradient
-        nt.links.new(M(nt, "ADD", sl, M(nt, "MULTIPLY", lp.outputs["Is Camera Ray"], sk - sl)), bg.inputs[1])
+        # glass and water mirror the sky the camera sees, not the dimmer one that lights the scene
+        seen = M(nt, "MAXIMUM", lp.outputs["Is Camera Ray"], M(nt, "MULTIPLY", lp.outputs["Is Glossy Ray"], float(cfg("look.sky_mirror", 1.0))))
+        nt.links.new(M(nt, "ADD", sl, M(nt, "MULTIPLY", seen, sk - sl)), bg.inputs[1])
     return w
 
 
@@ -149,6 +153,17 @@ def haze(reach):
     m, nt, out = new_mat("haze")
     s = nd(nt, "ShaderNodeVolumeScatter", {"Color": {"day": (0.78, 0.86, 1.0, 1), "sunset": (1.0, 0.72, 0.42, 1), "night": (0.8, 0.8, 0.85, 1)}[t],
                                            "Density": dens, "Anisotropy": 0.55})
+    glow = float(arg("hazeglow", pf.by_tod("look.haze_glow", 0.0)))
+    if glow > 0:
+        # Real haze is lit from all sides by light scattered many times; with two volume bounces the far haze comes
+        # out darker than the sky above it (a dark wall on the horizon). A faint glow of its own stands in for the
+        # missing bounces: look.haze_glow is the brightness a kilometre-deep bank of it reaches.
+        e = nd(nt, "ShaderNodeEmission", {"Color": pf.rgba(cfg("look.haze_color", {"day": (0.86, 0.84, 0.80), "sunset": (1.0, 0.70, 0.45), "night": (0.3, 0.3, 0.4)}[t])),
+                                          "Strength": dens * glow})
+        ad = nd(nt, "ShaderNodeAddShader")
+        nt.links.new(s.outputs[0], ad.inputs[0])
+        nt.links.new(e.outputs[0], ad.inputs[1])
+        s = ad
     nt.links.new(s.outputs[0], out.inputs["Volume"])
     top = float(cfg("look.haze_top_m", 800))
     bm = bmesh.new()
@@ -226,6 +241,10 @@ def grade(sc):
 
 
 # ---------------------------------------------------------------- materials
+# what coated tower glass reflects back (linear RGB): sky blue, teal, silver, dark blue-grey, bronze, blue again
+GLASS_TINTS = [(0.42, 0.56, 0.72), (0.30, 0.48, 0.50), (0.62, 0.66, 0.70), (0.20, 0.26, 0.32), (0.50, 0.40, 0.26), (0.36, 0.52, 0.66)]
+
+
 def mat_buildings():
     """Every ordinary building is one mesh with face attributes: col (wall or roof colour), roof (1 on roofs),
     glass (curtain wall), rnd (per building; below 0.05 = shed without windows). The shader draws floors, window
@@ -249,9 +268,18 @@ def mat_buildings():
     wh = M(nt, "MULTIPLY", M(nt, "GREATER_THAN", fh, ww), M(nt, "LESS_THAN", fh, M(nt, "SUBTRACT", 1.0, ww)))
     above = M(nt, "GREATER_THAN", pz, 2.8)
     win = M(nt, "MULTIPLY", M(nt, "MULTIPLY", wv, wh), above)
-    mull = M(nt, "MULTIPLY", M(nt, "GREATER_THAN", M(nt, "FRACT", M(nt, "DIVIDE", hc, 1.6)), 0.07),
-             M(nt, "GREATER_THAN", M(nt, "FRACT", M(nt, "DIVIDE", pz, FL + 0.4)), 0.1))
-    win = M(nt, "ADD", M(nt, "MULTIPLY", win, M(nt, "SUBTRACT", 1.0, glass)), M(nt, "MULTIPLY", mull, glass))
+    # curtain walls (glass = 1): a pane grid PW wide and one floor tall; under each floor's vision glass a spandrel
+    # band; a mullion between panes. Every tower gets its own tint, band height and style from rnd: ribbon windows
+    # between cladding bands, an all-glass skin, or a skin with strong vertical fins.
+    PW = 1.5
+    gu = M(nt, "ADD", M(nt, "DIVIDE", hc, PW), M(nt, "MULTIPLY", rnd, 3.3))
+    gh, gz = M(nt, "FRACT", gu), M(nt, "FRACT", M(nt, "DIVIDE", pz, FL))
+    style = M(nt, "FRACT", M(nt, "MULTIPLY", rnd, 11.13))
+    sp = M(nt, "LESS_THAN", gz, M(nt, "ADD", 0.18, M(nt, "MULTIPLY", M(nt, "FRACT", M(nt, "MULTIPLY", rnd, 2.9)), 0.2)))
+    mv = M(nt, "LESS_THAN", gh, M(nt, "ADD", 0.035, M(nt, "MULTIPLY", M(nt, "GREATER_THAN", style, 0.7), 0.05)))
+    ribbon = M(nt, "LESS_THAN", style, 0.35)
+    vis = M(nt, "MULTIPLY", M(nt, "SUBTRACT", 1.0, sp), M(nt, "SUBTRACT", 1.0, mv))
+    win = M(nt, "ADD", M(nt, "MULTIPLY", win, M(nt, "SUBTRACT", 1.0, glass)), M(nt, "MULTIPLY", vis, glass))
     has_win = M(nt, "GREATER_THAN", rnd, 0.05)
     not_roof = M(nt, "SUBTRACT", 1.0, roof)
     win = M(nt, "MULTIPLY", M(nt, "MULTIPLY", win, wall), M(nt, "MULTIPLY", has_win, not_roof), clamp=True)
@@ -294,13 +322,45 @@ def mat_buildings():
     put(nt, ms.inputs[0], win)
     nt.links.new(wallb.outputs[0], ms.inputs[1])
     nt.links.new(gl.outputs[0], ms.inputs[2])
-    nt.links.new(ms.outputs[0], out.inputs[0])
-    if pf.tod() == "night":             # about a quarter of the windows lit, warm and cool
+    # the curtain wall itself: coated glass is a tinted mirror of the sky and the towers opposite. Each pane sits a
+    # hair out of plane (what breaks a real facade's reflection into a quilt), a few have blinds down.
+    wg = nd(nt, "ShaderNodeTexWhiteNoise", noise_dimensions="3D")
+    nt.links.new(comb(nt, M(nt, "FLOOR", gu), M(nt, "FLOOR", M(nt, "DIVIDE", pz, FL)), M(nt, "ADD", M(nt, "MULTIPLY", rnd, 97.0), 31.0)), wg.inputs["Vector"])
+    pr = wg.outputs["Value"]
+    tint = ramp(nt, M(nt, "FRACT", M(nt, "MULTIPLY", rnd, 5.71)), [(i / (len(GLASS_TINTS) - 1), c) for i, c in enumerate(GLASS_TINTS)])
+    blind = M(nt, "GREATER_THAN", pr, 0.88)
+    pane = mix(nt, 1.0, tint, maprange(nt, pr, 0.0, 1.0, 0.82, 1.12), "MULTIPLY")
+    pane = mix(nt, M(nt, "MULTIPLY", blind, 0.4), pane, (0.62, 0.61, 0.57, 1))
+    spc = mix(nt, ribbon, mix(nt, 1.0, tint, (0.5, 0.5, 0.5, 1), "MULTIPLY"), mix(nt, 0.5, col, (0.66, 0.66, 0.64, 1)))
+    cwc = mix(nt, mv, mix(nt, sp, pane, spc), mix(nt, 0.5, mix(nt, 1.0, tint, (0.6, 0.6, 0.6, 1), "MULTIPLY"), (0.50, 0.52, 0.55, 1)))
+    cmetal = M(nt, "SUBTRACT", 0.85, M(nt, "MULTIPLY", sp, M(nt, "ADD", 0.15, M(nt, "MULTIPLY", ribbon, 0.70))))
+    cmetal = M(nt, "MAXIMUM", M(nt, "MULTIPLY", cmetal, M(nt, "SUBTRACT", 1.0, mv)), M(nt, "MULTIPLY", mv, 0.9))
+    crough = M(nt, "ADD", M(nt, "ADD", 0.02, M(nt, "MULTIPLY", pr, 0.035)), M(nt, "MULTIPLY", blind, 0.25))
+    crough = M(nt, "ADD", crough, M(nt, "MULTIPLY", sp, M(nt, "ADD", 0.10, M(nt, "MULTIPLY", ribbon, 0.45))))
+    crough = M(nt, "MAXIMUM", crough, M(nt, "MULTIPLY", mv, 0.35))
+    tilt = VM(nt, "SCALE", VM(nt, "SUBTRACT", wg.outputs["Color"], (0.5, 0.5, 0.5)), None)
+    tilt.node.inputs["Scale"].default_value = float(cfg("region.glass_ripple", 0.03))
+    cw = principled(nt, cwc, crough, cmetal, spec=0.6, normal=VM(nt, "NORMALIZE", VM(nt, "ADD", N, tilt)))
+    ms2 = nd(nt, "ShaderNodeMixShader")
+    put(nt, ms2.inputs[0], M(nt, "MULTIPLY", M(nt, "MULTIPLY", glass, wall), M(nt, "MULTIPLY", has_win, not_roof), clamp=True))
+    nt.links.new(ms.outputs[0], ms2.inputs[1])
+    nt.links.new(cw.outputs[0], ms2.inputs[2])
+    nt.links.new(ms2.outputs[0], out.inputs[0])
+    if pf.tod() == "night":
+        # how many windows are lit differs from building to building (3% to 30%), and so does each window's
+        # brightness: an even quarter at full power reads as a white checkerboard. An office tower also keeps a few
+        # whole floors on, dim and cool.
         wl = nd(nt, "ShaderNodeTexWhiteNoise", noise_dimensions="3D")
         nt.links.new(VM(nt, "ADD", cell, (0.0, 0.0, 13.0)), wl.inputs["Vector"])
-        lit = M(nt, "GREATER_THAN", wl.outputs["Value"], 0.74)
-        wc_ = ramp(nt, wl.outputs["Color"], [(0.0, (1.0, 0.62, 0.30)), (0.6, (1.0, 0.80, 0.55)), (0.92, (0.80, 0.88, 1.0)), (1.0, (0.55, 0.70, 1.0))])
-        pf.add_emission(m, wc_, M(nt, "MULTIPLY", M(nt, "MULTIPLY", win, lit), 1.6))
+        lit = M(nt, "GREATER_THAN", wl.outputs["Value"], M(nt, "ADD", 0.70, M(nt, "MULTIPLY", M(nt, "FRACT", M(nt, "MULTIPLY", rnd, 23.7)), 0.27)))
+        wc_ = ramp(nt, wl.outputs["Color"], [(0.0, (1.0, 0.55, 0.24)), (0.6, (1.0, 0.72, 0.42)), (0.92, (0.85, 0.88, 0.95)), (1.0, (0.60, 0.74, 1.0))])
+        bright = maprange(nt, sep(nt, wl.outputs["Color"])[1], 0.0, 1.0, 0.18, 1.0)
+        fl = nd(nt, "ShaderNodeTexWhiteNoise", noise_dimensions="3D")
+        nt.links.new(comb(nt, 7.0, M(nt, "FLOOR", M(nt, "DIVIDE", pz, FL)), M(nt, "MULTIPLY", rnd, 53.0)), fl.inputs["Vector"])
+        floor_on = M(nt, "MULTIPLY", M(nt, "MULTIPLY", glass, M(nt, "GREATER_THAN", fl.outputs["Value"], 0.91)), M(nt, "SUBTRACT", 1.0, lit))
+        k = float(cfg("look.window_light", 1.0))
+        power = M(nt, "MULTIPLY", win, M(nt, "ADD", M(nt, "MULTIPLY", M(nt, "MULTIPLY", lit, bright), 0.9 * k), M(nt, "MULTIPLY", floor_on, 0.22 * k)))
+        pf.add_emission(m, mix(nt, floor_on, wc_, (0.80, 0.90, 1.0, 1)), power)
     return m
 
 

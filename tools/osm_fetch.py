@@ -98,6 +98,51 @@ def q_far(lat, lon, r):
     return "[out:json][timeout:120];(%s);out body;>;out skel qt;" % "".join(s % a + ";" for s in sel)
 
 
+def q_far_buildings(lat, lon, r):
+    return "[out:json][timeout:180];way(around:%d,%.6f,%.6f)[building];out tags geom qt;" % (r, lat, lon)
+
+
+def far_buildings(d, lat0, lon0, radius):
+    """Every mapped building beyond the detailed radius, as its smallest enclosing rectangle and its height: the real
+    skyline, where a generated one would put towers at random. Row: [x, y, width, depth, angle, height_m, levels];
+    a tall one (40 m or 12 floors up) also carries its footprint."""
+    ky, kx = 110574.0, 111320.0 * math.cos(math.radians(lat0))
+    out = []
+    for e in d["elements"]:
+        g = e.get("geometry")
+        if e["type"] != "way" or not g or len(g) < 4:
+            continue
+        t = e.get("tags") or {}
+        if t.get("building") in ("no", "roof", "construction") or t.get("location") == "underground":
+            continue
+        p = [((q["lon"] - lon0) * kx, (q["lat"] - lat0) * ky) for q in g]
+        if p[0] == p[-1]:
+            p = p[:-1]
+        cx, cy = sum(q[0] for q in p) / len(p), sum(q[1] for q in p) / len(p)
+        if cx * cx + cy * cy <= radius * radius:        # inside the radius the near map has it, in full
+            continue
+        best = None
+        for i in range(len(p)):
+            (x0, y0), (x1, y1) = p[i], p[(i + 1) % len(p)]
+            if math.hypot(x1 - x0, y1 - y0) < 0.5:
+                continue
+            a = math.atan2(y1 - y0, x1 - x0)
+            c, s_ = math.cos(a), math.sin(a)
+            us, vs = [x * c + y * s_ for x, y in p], [-x * s_ + y * c for x, y in p]
+            w, dd = max(us) - min(us), max(vs) - min(vs)
+            if best is None or w * dd < best[0]:
+                u, v = (max(us) + min(us)) / 2, (max(vs) + min(vs)) / 2
+                best = (w * dd, u * c - v * s_, u * s_ + v * c, w, dd, a)
+        if not best or best[0] < 12.0:
+            continue
+        h, lv = num(t.get("height") or t.get("building:height")) or 0, num(t.get("building:levels")) or 0
+        row = [round(best[1], 1), round(best[2], 1), round(best[3], 1), round(best[4], 1), round(best[5], 3), round(h, 1), lv]
+        if (h >= 40 or lv >= 12) and len(p) <= 60:
+            row.append([round(c, 1) for q in p for c in q])
+        out.append(row)
+    return out
+
+
 def num(s, default=None):
     """'12 m', '12.5', '40 ft' -> metres."""
     if s is None:
@@ -398,6 +443,15 @@ def main():
             json.dump(fr, open(far_p, "w"))
             far = convert(fr, lat, lon, far_r, far=True)
             far = {k: far[k] for k in ("water", "waterways", "coast", "roads", "rails", "areas")}
+            fb_p = os.path.join(proj, "map", "osm_far_buildings_raw.json")
+            fb = json.load(open(fb_p)) if ("--reuse" in args and os.path.exists(fb_p)) else overpass(q_far_buildings(lat, lon, far_r), 240)
+            if fb:
+                json.dump(fb, open(fb_p, "w"))
+                far["buildings"] = far_buildings(fb, lat, lon, radius * 1.08)
+                tall = sum(1 for b in far["buildings"] if len(b) > 7)
+                print("far ring: %d mapped buildings, %d of them tall (40 m or 12 floors up): the real skyline" % (len(far["buildings"]), tall))
+            else:
+                print("far ring: no mapped buildings fetched; the engine generates the far city (rerun `pf map --reuse` later)")
         else:
             print("far ring: Overpass unreachable, the engine will fill the distance procedurally (rerun `pf map` later)")
     osm["far"] = far

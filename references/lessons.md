@@ -45,3 +45,24 @@ improves from one use to the next.
   the shaded side against a photo of the shaded side.
 - A dolly whose look point travels past the camera swings the view into the sky halfway. Keep both look points far
   from the camera path, and pick a frame from the middle of every shot, not only its ends.
+- After two detail passes the user still felt "no realism at all". More small parts were not the answer; five scene-wide
+  things were (now "What makes a render read as fake" in SKILL.md). The sun stood behind the subjects, so every front
+  was flat grey: a real late-afternoon position that side-lights the views changed more than any model. Tower glass
+  was grey noise: a tinted mirror with one tint per tower and panes a hair out of plane made the district read as
+  glass. The far city was a generated ring: 38,825 mapped buildings out to 6 km put the real skyline, the low
+  districts and the coast where they are. Wide lenses tilted up made towers lean: level views with lens shift.
+  Deep haze with two volume bounces is a dark wall: `look.haze_glow`, and a haze layer taller than every camera.
+- Know each reference photo's date. Most licensed photos of this place were from 2010 to 2015, before the opera
+  house, a re-clad hotel and a mall extension. `pf photos --dates` lists them; `refs.since` marks the old ones.
+  Search by a neighbour's own name to find recent photos of it.
+- A canal bank mapped as coastline that ends inside the far radius closed into a "sea" over the whole city: no people
+  were placed, with no error. Watch the counts in the build log after every map change; the engine now drops such
+  a polygon and says so.
+- Night: an even quarter of windows lit at full power is a white checkerboard. Vary the lit share per building
+  (3 to 30%), the brightness per window, keep colours warm, and give the sky a glow.
+- A volume lit only by the sky is blue-grey smoke. Fountain spray needs a little emission of its own by day to stay
+  white, and a narrow column: a wide faint one is a ghost.
+- The web viewer capped the orbit at the horizon, so every view from street level looking up at the tower was
+  flipped to an aerial one. Open each view button in `pf shot` after adding views; do not assume they work.
+- Delegating the named neighbours to a second agent while the engine was reworked halved the wall time. Give it one
+  file, the dated photo list and the free checks (`pf build`, `pf shot`), and render its work in Cycles yourself.

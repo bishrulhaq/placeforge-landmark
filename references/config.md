@@ -14,7 +14,8 @@ Positions are metres east, north, up from the pin. Bearings are compass degrees 
 | `landmark.remove_names` | Names of mapped buildings to drop (the map's stand-in for the landmark) |
 | `refs.target` | The photo the still must match |
 | `camera` | Written by `pf camera`: `focal_px`, `horizon_row`, `height_m`, `distance_m`, `bearing_deg`, `offset_right_m`, `ref_w`, `ref_h` |
-| `views` | Extra cameras: `{"name": {"from": [x, y, z], "to": [x, y, z], "lens": 35}}` |
+| `views` | Extra cameras: `{"name": {"from": [x, y, z], "to": [x, y, z], "lens": 35}}`. Add `"level": true` for a level camera with the lens shifted (verticals stay vertical) |
+| `refs.since` | Year of the place's last big change: older reference photos are marked OLD, newer ones are fetched first |
 | `compare.regions` | Named boxes on the target in its own pixels `[x0, y0, x1, y1]`: sky, water, the landmark's parts. With them `pf compare` scores those; without, a 6 x 4 grid |
 | `time.tod` | `day`, `sunset` or `night` (or `tod=night` per run) |
 | `time.<tod>.sun_elevation`, `.sun_bearing` | Where the sun (moon at night) is. `pf sun P --when ... --tz ... --write day` computes it |
@@ -38,7 +39,13 @@ Positions are metres east, north, up from the pin. Bearings are compass degrees 
 | `neighbours` | A list of overrides for single mapped buildings: `{"match": "part of its name"}` or `{"at": [x, y], "r": 0}`, optionally `"part": true` or `false` (only a mapped 3D part, or only an outline, when both carry the name), then any of `height_m`, `walls` and `roof` (linear RGB), `glass` (0 or 1), `drop` (true: `neighbours.py` models it by hand). `pf neighbours P` lists the candidates |
 | `infill.density` | `"auto"`, 0 (off) to 1: lots along streets the map shows without buildings |
 | `infill.lot_m`, `infill.floors` | Lot size range and floors of generated buildings |
-| `far.urban`, `far.trees` | Density of the generated far ring |
+| `far.urban`, `far.trees` | Density of the generated far ring (used only where the map has few buildings there) |
+| `far.mapped_min` | From this many mapped far buildings on (400), the far city is the mapped one, not a generated ring |
+| `look.haze_glow` | Brightness of deep haze (0 = off; 0.5 to 1 stops the far haze reading as a dark wall). `look.haze_color` |
+| `look.sky_mirror` | How much of the camera's sky brightness reflections see (1) |
+| `look.night_glow` | Glow of the night sky over a city (1; 2 to 3 for a big one). `look.window_light`: lit-window strength |
+| `region.glass_ripple` | How far each curtain-wall pane sits out of plane (0.03); `region.tower_tops`: false = plain flat lids |
+| `life.rotor_blur` | 1: helicopter blades as a smeared disc, the way a camera sees them; 0: sharp blades |
 | `life.vehicles`, `life.people` | 0 to 1. `life.street_lamps`: true or false |
 | `life.helicopter` | 1 or 0. `life.heli_radius`, `life.heli_height` in metres (0 = from the landmark's height), `life.heli_bearing`: where on its circle it is at time 0, `life.heli_speed` (30 m/s), `life.heli_clear_m` (60): the distance it keeps from the landmark and from buildings; the circle is widened or raised to hold it |
 | `web.links` | Links shown in the Three.js page's panel: `{"Read the article": "https://...", "GitHub": "https://..."}` |

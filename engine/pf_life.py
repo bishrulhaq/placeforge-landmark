@@ -251,6 +251,50 @@ def hub_of(me):
     return (lo + hi) / 2
 
 
+def rotor_disc(o, coll, nb=4, axis=2, rps=6.3, fps=24.0):
+    """A turning rotor as a camera sees it. At 24 frames a second a blade moves a quarter turn between frames: sharp
+    blades stand still or jump, which reads as a model on a string. The blades are taken off (the hub stays) and a
+    disc is put in their place: each blade smeared over the arc it sweeps while the shutter is open, the rest of the
+    disc almost clear. o: the rotor object, its hub at its origin. Returns the blade radius."""
+    me = o.data
+    ax = [i for i in range(3) if i != axis]
+    R = max(math.hypot(v.co[ax[0]], v.co[ax[1]]) for v in me.vertices)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    hub = {i for i, m_ in enumerate(me.materials) if m_ and "hub" in m_.name.lower()}
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index not in hub], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    m, nt, out = pf.new_mat("rotor_blur_%d" % nb)
+    P = pf.nd(nt, "ShaderNodeTexCoord").outputs["Object"]
+    px, py, _ = pf.sep(nt, P)
+    ang = pf.M(nt, "ARCTAN2", py, px)
+    sweep = min(0.9, rps * nb * 0.5 / fps)                         # share of a blade pitch one blade covers in half a frame
+    wedge = pf.M(nt, "LESS_THAN", pf.M(nt, "FRACT", pf.M(nt, "ADD", pf.M(nt, "MULTIPLY", ang, nb / (2 * math.pi)), 8.0)), sweep)
+    r = pf.M(nt, "DIVIDE", pf.VM(nt, "LENGTH", P, out=1), R)
+    edge = pf.M(nt, "MULTIPLY", pf.M(nt, "GREATER_THAN", r, 0.07), pf.maprange(nt, r, 0.96, 1.0, 1.0, 0.0))
+    alpha = pf.M(nt, "MULTIPLY", edge, pf.M(nt, "ADD", 0.05, pf.M(nt, "MULTIPLY", wedge, 0.40)))
+    p = pf.principled(nt, (0.025, 0.025, 0.03), 0.5)
+    tp = pf.nd(nt, "ShaderNodeBsdfTransparent")
+    ms = pf.nd(nt, "ShaderNodeMixShader")
+    pf.put(nt, ms.inputs[0], alpha)
+    nt.links.new(tp.outputs[0], ms.inputs[1])
+    nt.links.new(p.outputs[0], ms.inputs[2])
+    nt.links.new(ms.outputs[0], out.inputs[0])
+    m.diffuse_color = (0.03, 0.03, 0.03, 0.25)
+    bm = bmesh.new()
+    bmesh.ops.create_circle(bm, cap_ends=True, cap_tris=True, segments=48, radius=R)
+    d = bpy.data.objects.new(o.name + "_disc", bpy.data.meshes.new(o.name + "_disc"))
+    bm.to_mesh(d.data)
+    bm.free()
+    d.data.materials.append(m)
+    coll.objects.link(d)
+    d.parent = o
+    d.rotation_euler = {0: (0, math.pi / 2, 0), 1: (math.pi / 2, 0, 0), 2: (0, 0, 0)}[axis]
+    d.visible_shadow = False
+    return R
+
+
 # ---------------------------------------------------------------- the moving scene
 class Life:
     def __init__(self):
@@ -309,7 +353,7 @@ class Life:
         d["trains"] = [v for tr in self.trains for v in (tr[1], tr[2], tr[3], tr[4])]
         h = self.heli
         if h:
-            d["heli"] = {k: h[k] for k in ("cx", "cy", "r", "z", "a0", "w", "bank", "pitch", "rps", "tail_rps", "tail_axis")}
+            d["heli"] = {k: h[k] for k in ("cx", "cy", "r", "z", "a0", "w", "bank", "pitch", "rps", "tail_rps", "tail_axis", "main_r", "tail_r") if k in h}
             d["heli"].update(main_hub=list(h["main"].location), tail_hub=list(h["tail"].location),
                              soups=[soup(h["body"].data, 4200), soup(h["main"].data, 500), soup(h["tail"].data, 200)])
         return d
@@ -463,8 +507,12 @@ def build(mp, rng, H=60.0):
             dims = [max(v.co[i] for v in tl.data.vertices) - min(v.co[i] for v in tl.data.vertices) for i in range(3)]
             for o in (body, main, tl):
                 o.parent = root
+            blur = {}
+            if int(cfg("life.rotor_blur", 1)):                  # blades as a camera sees them: a smeared disc
+                blur = dict(main_r=rotor_disc(main, coll, int(m.get("blades", 4)), 2, 6.3, float(cfg("film.fps", 24))),
+                            tail_r=rotor_disc(tl, coll, 2, dims.index(min(dims)), 27.0, float(cfg("film.fps", 24))))
             L_.heli = dict(pf.heli_orbit(H, getattr(mp, "tops", ())), root=root, body=body, main=main, tail=tl, rps=6.3, tail_rps=27.0,
-                           tail_axis=dims.index(min(dims)))
+                           tail_axis=dims.index(min(dims)), **blur)
             pf.HELI = L_.heli
     L_.update(1, 0.0)
     pf.log("life: %d vehicles moving, %d parked, %d people, %d train cars, helicopter %s (models: %s)" % (

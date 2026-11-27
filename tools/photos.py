@@ -2,6 +2,8 @@
 
     python3 photos.py <project> [--query "Lotus Tower Colombo"] [--max 24] [--browser]
     python3 photos.py <project> --drop cc_04,cc_08        (set aside what is not the place: art, interiors, models)
+    python3 photos.py <project> --since 2019              (the place last changed in 2019: fetch newer photos first)
+    python3 photos.py <project> --dates                   (when each photo was taken; fills in what is missing)
 
 Tier 1 (always): sources that publish photos under stated licences, through their public APIs.
     Wikimedia Commons   photos taken near the pin (geosearch) and photos found by the place's name
@@ -17,6 +19,11 @@ release is used instead. If it cannot be installed or started, the Chrome alread
   searches; at most three searches and 30 images; on a captcha or a block it stops and says so (no retry, no other
   engine).
   Files: refs/web_NN.jpg. Licence unknown: reference only, never publish them. They are git-ignored.
+
+A place changes: towers go up, a facade is re-clad, a square is rebuilt. Every photo's capture date is recorded
+(the source's own field, else the file's EXIF, else a year in its title), the newest are fetched first, and a photo
+taken before place.json "refs.since" (the year of the place's last big change) is marked OLD: use it only for what
+has not changed since.
 
 Every photo is listed in refs/_sources.json; refs/CREDITS.md has the credit lines for the licensed ones.
 Then: pf refs <project>, look at the contact sheet, choose the target, and tell the user what was found.
@@ -47,6 +54,68 @@ def strip(s):
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", s or ""))).strip()[:160]
 
 
+MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
+
+def when(*texts):
+    """A capture date out of whatever a source gives: "2014-11-15 10:02:11", "Taken on 15 November 2014",
+    "March 3, 2019", "Dubai - 2013". Returns "YYYY-MM-DD", "YYYY" or ""."""
+    for s in texts:
+        s = str(s or "")
+        m = re.search(r"(?<!\d)((?:19|20)\d\d)[-:/.](\d\d)[-:/.](\d\d)(?!\d)", s)
+        if m and 1 <= int(m.group(2)) <= 12 and 1 <= int(m.group(3)) <= 31:
+            return "%s-%s-%s" % m.groups()
+        m = re.search(r"(?<!\d)(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?,?\s+((?:19|20)\d\d)(?!\d)", s)
+        if m and m.group(2).lower() in MONTHS:
+            return "%s-%02d-%02d" % (m.group(3), MONTHS.index(m.group(2).lower()) + 1, int(m.group(1)))
+        m = re.search(r"([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+((?:19|20)\d\d)(?!\d)", s)
+        if m and m.group(1).lower() in MONTHS:
+            return "%s-%02d-%02d" % (m.group(3), MONTHS.index(m.group(1).lower()) + 1, int(m.group(2)))
+        m = re.search(r"(?<!\d)((?:19|20)\d\d)(?!\d)", s)
+        if m and int(m.group(1)) <= time.gmtime().tm_year:
+            return m.group(1)
+    return ""
+
+
+def exif_date(path):
+    """The camera's own capture time, if the file still carries it (many sites strip it from resized copies)."""
+    try:
+        from PIL import Image
+        ex = Image.open(path).getexif()
+        return when(ex.get_ifd(0x8769).get(36867) or ex.get_ifd(0x8769).get(36868) or "")
+    except Exception:
+        return ""
+
+
+def year_of(it):
+    d = it.get("date") or ""
+    return int(d[:4]) if re.match(r"(19|20)\d\d", d) else 0
+
+
+def dated(it, path=None):
+    """Settle one photo's capture date and where it came from: the source's field, the file's EXIF, the title."""
+    d = when(it.get("date_raw") or it.get("date"))
+    src = "source" if d else ""
+    if not d and path and os.path.exists(path):
+        d = exif_date(path)
+        src = "exif" if d else ""
+    if not d:
+        d = when(it.get("title"))
+        src = "title" if d else ""
+    it["date"], it["date_from"] = d, src
+    it.pop("date_raw", None)
+    return it
+
+
+def newest_first(pool, since):
+    """Photos from `since` on first (newest first), then the undated, then the older ones: a stable sort, so the
+    source's own order (relevance) still decides inside each group."""
+    def key(it):
+        y = year_of(it)
+        return (0, -y) if y >= since else (1, 0) if not y else (2, -y)
+    return sorted(pool, key=key)
+
+
 def commons_items(d, source):
     out = []
     for p in sorted((d.get("query") or {}).get("pages") or [], key=lambda p: p.get("index", 0)):
@@ -57,7 +126,8 @@ def commons_items(d, source):
         v = lambda k: strip((m.get(k) or {}).get("value", ""))
         out.append({"source": source, "title": p["title"].replace("File:", ""), "url": ii.get("thumburl") or ii["url"],
                     "page": ii.get("descriptionurl", ""), "author": v("Artist") or "unknown", "licence": v("LicenseShortName") or "see page",
-                    "w": ii.get("width"), "h": ii.get("height"), "date": v("DateTimeOriginal")[:10]})
+                    "w": ii.get("width"), "h": ii.get("height"), "date": when(v("DateTimeOriginal")), "date_raw": v("DateTimeOriginal"),
+                    "uploaded": when(v("DateTime"))})
     return out
 
 
@@ -196,6 +266,49 @@ def main():
                 n += 1
         print("set aside %d photo(s) in refs/_rejected/ (pf refs skips them)" % n)
         return
+    refs_, sp_ = os.path.join(proj, "refs"), os.path.join(proj, "refs", "_sources.json")
+    since = int(opt("--since", (P.get("refs") or {}).get("since") or 0) or 0)
+    if "--dates" in a:                # photos.py P --dates : when each kept photo was taken
+        known = json.load(open(sp_)) if os.path.exists(sp_) else []
+        listed = {k.get("file") for k in known}
+        for f in sorted(os.listdir(refs_)):               # the user's own photos are not in _sources.json
+            if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.startswith("_") and f not in listed:
+                known.append({"file": f, "title": f, "tier": 0, "source": "user"})
+        todo = [k for k in known if k.get("page", "").startswith("https://commons.wikimedia.org/wiki/File:") and not when(k.get("date"))]
+        for i in range(0, len(todo), 40):                 # a date the old [:10] cut destroyed: ask Commons again
+            titles = [urllib.parse.unquote(k["page"].split("/wiki/")[1]).replace("_", " ") for k in todo[i:i + 40]]
+            try:
+                d = get(COMMONS, {"action": "query", "format": "json", "formatversion": 2, "titles": "|".join(titles), "prop": "imageinfo", "iiprop": "extmetadata"})
+            except Exception as e:
+                print("commons: no answer (%s); dates stay as they are" % str(e)[:60])
+                break
+            got = {p_["title"]: ((p_.get("imageinfo") or [{}])[0].get("extmetadata") or {}) for p_ in (d.get("query") or {}).get("pages") or []}
+            for k, t in zip(todo[i:i + 40], titles):
+                m = got.get(t) or {}
+                k["date_raw"] = strip((m.get("DateTimeOriginal") or {}).get("value", ""))
+                k["uploaded"] = when(strip((m.get("DateTime") or {}).get("value", "")))
+            time.sleep(1.0)
+        rows = []
+        for k in known:
+            path = os.path.join(refs_, k.get("file") or "")
+            if k.get("tier") == 0 or os.path.exists(path):
+                dated(k, path)
+                rows.append(k)
+            else:
+                dated(k)
+        json.dump([k for k in known if k.get("tier") != 0], open(sp_, "w"), indent=1)
+        rows.sort(key=lambda k: k["file"])
+        rows.sort(key=lambda k: k.get("date") or "", reverse=True)
+        print("capture dates of the %d photos in refs/ (newest first)%s:" % (len(rows), "; OLD = before %d" % since if since else ""))
+        for k in rows:
+            y = year_of(k)
+            print("  %-10s %-6s %-4s %-24s %s" % (k.get("date") or "undated", k.get("date_from") or "", "OLD" if since and y and y < since else "", k["file"], (k.get("title") or "")[:60]))
+        ys = [year_of(k) for k in rows if year_of(k)]
+        print("dated: %d of %d; newest %s, oldest %s; from %d on: %d" % (len(ys), len(rows), max(ys) if ys else "-", min(ys) if ys else "-",
+                                                                     since or time.gmtime().tm_year - 5, sum(1 for y in ys if y >= (since or time.gmtime().tm_year - 5))))
+        if not since:
+            print('set place.json "refs.since" to the year of the place\'s last big change (a new tower, a re-clad facade, a rebuilt square): older photos are then marked OLD')
+        return
     query, cap = opt("--query", P["name"]), int(opt("--max", 24))
     lat, lon, radius = float(P["lat"]), float(P["lon"]), float(P.get("radius_m", 800))
     env = open(os.path.join(proj, ".env")).read() if os.path.exists(os.path.join(proj, ".env")) else ""
@@ -218,7 +331,7 @@ def main():
             r = fn()
             if name == "wikidata":
                 facts, r = r
-            pools.append(r)
+            pools.append(newest_first([dated(dict(i)) for i in r], since or time.gmtime().tm_year - 8))
             print("%-13s %d candidates" % (name, len(r)), flush=True)
         except Exception as e:
             print("%-13s failed (%s)" % (name, str(e)[:70]))
@@ -275,6 +388,7 @@ def main():
                 continue
         except ImportError:
             pass
+        dated(it, os.path.join(refs, fn))
         known.append(dict(it, file=fn, tier=tier, sha1=h, fetched=time.strftime("%Y-%m-%d")))
         got += 1
         time.sleep(0.4)
@@ -293,6 +407,8 @@ def main():
     if os.path.exists(gi) and "refs/web_*" not in open(gi).read():
         open(gi, "a").write("refs/web_*\n")
     t1, t2 = sum(1 for k in known if k["tier"] == 1), sum(1 for k in known if k["tier"] == 2)
+    ys = [year_of(k) for k in known if year_of(k)]
+    print("capture dates: %d of %d known; newest %s, oldest %s  (pf photos %s --dates lists them)" % (len(ys), len(known), max(ys) if ys else "-", min(ys) if ys else "-", proj))
     print("photos: %d new; %d licensed (cc_*), %d web-search (web_*, reference only) in %s" % (got, t1, t2, refs))
     if t1 + t2 < 3:
         print("TOO FEW: ask the user for photos (one wide, level view and two close-ups)%s." % ("" if use_browser else ", or rerun with --browser if they agree to a web image search"))

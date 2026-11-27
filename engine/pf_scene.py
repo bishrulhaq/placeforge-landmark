@@ -120,6 +120,7 @@ def main():
             cam.set_frame(c, poses, f)
         for sock, fn in pf.TIMED:
             sock.default_value = fn(t)
+        pf.jets_update(t)
         if life:
             life.update(f, t)
         if lm and hasattr(lm, "update"):

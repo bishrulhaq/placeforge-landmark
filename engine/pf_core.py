@@ -51,6 +51,29 @@ TIMED = []          # (socket, f(t seconds)): shader values the film sets every 
 HELI = None         # the helicopter's orbit once the life is built (heli_orbit); the film camera follows it
 LANDMARK = []       # the landmark's mesh objects (pf_scene fills it): flight paths keep clear of them
 NEIGHBOURS = []     # hand-modelled neighbours (neighbours.py): obstacles too
+JETS = []           # fountain jets (object or None, x, y, z, height m, phase, burst): one show for the film and the viewer
+
+
+def jet_k(t, ph, burst):
+    """How high a fountain jet stands at t seconds, 0 to 1: a wave running along the nozzles; a burst nozzle (a big
+    shooter) fires for four seconds in every twelve. The viewer runs the same formula."""
+    if burst:
+        c = (t + 2.0) % 12.0
+        return math.sin(math.pi * c / 4.0) ** 0.6 if c < 4.0 else 0.0
+    return 0.30 + 0.70 * abs(math.sin(0.9 * t - ph))
+
+
+def jet(o, x, y, z, h, ph, burst=False):
+    """Register one fountain jet. o: a unit-height object standing at (x, y, z) that the film stretches every frame,
+    or None when there is nothing to render (the web export still draws the jet from these numbers)."""
+    JETS.append((o, x, y, z, h, ph, bool(burst)))
+
+
+def jets_update(t):
+    for o, x, y, z, h, ph, burst in JETS:
+        if o is not None:
+            sz = max(h * jet_k(t, ph, burst), 0.01)
+            o.scale = (1.0 + sz * 0.035, 1.0 + sz * 0.035, sz)
 
 
 def heli_orbit(H, tops=()):

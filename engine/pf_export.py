@@ -134,7 +134,8 @@ def export(mp, B, trees, H, life=None):
             "sun": {"elevation": cfg("time.day.sun_elevation"), "bearing": cfg("time.day.sun_bearing"),
                     "sunset_bearing": cfg("time.sunset.sun_bearing")},
             "water": cfg("region.water"), "sea": cfg("region.sea"), "ground": cfg("region.ground", None), "chunks": chunks, "meshes": meshes,
-            "tree_kinds": ["broad", "round", "tall", "palm", "conifer"], "life": lf}
+            "tree_kinds": ["broad", "round", "tall", "palm", "conifer"], "life": lf,
+            "jets": [[round(float(v), 2) for v in (x, y, z, h, ph, 1.0 if burst else 0.0)] for _, x, y, z, h, ph, burst in pf.JETS]}
     json.dump(meta, open(os.path.join(out, "scene.json"), "w"), separators=(",", ":"))
     with gzip.open(os.path.join(out, "scene.bin.gz"), "wb", 6) as f:
         f.write(bytes(buf))

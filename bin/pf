@@ -221,15 +221,25 @@ def cmd_refs(args):
     cell, rows = 480, (len(ims) + 3) // 4
     sheet = Image.new("RGB", (cols * cell, rows * (cell + 22)), (20, 20, 20))
     d = ImageDraw.Draw(sheet)
+    sp = os.path.join(proj, "refs", "_sources.json")           # capture dates: a place changes, an old photo misleads
+    when = {k.get("file"): k.get("date") or "" for k in (json.load(open(sp)) if os.path.exists(sp) else [])}
+    since = int(place(proj).get("refs", {}).get("since") or 0)
     for i, f in enumerate(ims):
         im = Image.open(f).convert("RGB")
         im.thumbnail((cell - 8, cell - 8))
         x, y = (i % cols) * cell, (i // cols) * (cell + 22)
         sheet.paste(im, (x + (cell - im.width) // 2, y + (cell - im.height) // 2))
-        d.text((x + 6, y + cell + 4), "%d  %s  %dx%d" % (i + 1, os.path.basename(f)[:44], *Image.open(f).size), fill=(230, 230, 230))
+        dt = when.get(os.path.basename(f), "")
+        old = bool(since and dt[:4].isdigit() and int(dt[:4]) < since)
+        d.text((x + 6, y + cell + 4), "%d  %s  %dx%d  %s%s" % (i + 1, os.path.basename(f)[:34], *Image.open(f).size, dt or "undated", "  OLD" if old else ""),
+               fill=(255, 150, 90) if old else (230, 230, 230))
     out = os.path.join(proj, "refs", "_contact.jpg")
     sheet.save(out, quality=88)
     print("contact sheet:", out)
+    ys = [int(v[:4]) for v in when.values() if v[:4].isdigit()]
+    if when:
+        print("capture dates: %d of %d photos dated, newest %s, oldest %s%s. List: pf photos %s --dates" % (
+            len(ys), len(ims), max(ys) if ys else "-", min(ys) if ys else "-", "; %d OLD (before %d)" % (sum(1 for y in ys if y < since), since) if since else "", proj))
     t = place(proj).get("refs", {}).get("target")
     if t:
         im = Image.open(target_of(proj)).convert("RGB")

@@ -48,6 +48,10 @@ What is generated and what is not:
 9. **Detail must reach every output.** The user opens the web page as readily as the still. A floor line, a window
    or an arch that exists only in a Cycles node shader is missing from the page: build it as geometry, or hand the
    viewer its numbers (`pf.viewer_facade`). Check each detail in a Cycles view and in `pf shot` of the same view.
+10. **A photo shows the place on the day it was taken.** Places change: towers go up next door, a facade is re-clad
+    after a fire, a square is rebuilt. Before modelling from a photo, know its capture date (`pf photos P --dates`)
+    and the dates of the place's big changes; use the newest photos, and an older one only for what has not changed
+    since. Say in the report which photo, of which year, stands behind each modelled detail.
 
 ## 0. Intake: what to ask the user
 
@@ -108,6 +112,24 @@ pf photos P --drop cc_04,web_12                # set aside what is not the place
   (wide, level, daylight) and write it to `place.json` `refs.target`. Tell the user what was found, from where, and
   which photo you chose.
 - Still short of one wide view and two close-ups: ask the user. Do not model a landmark from one photo.
+
+### How old is each photo
+
+```bash
+pf photos P --dates                 # capture date of every photo in refs/, newest first; fills in what is missing
+pf photos P --since 2019            # fetch again, photos from 2019 on first
+```
+
+- Every fetched photo carries its capture date in `refs/_sources.json`: the source's own field, else the file's
+  EXIF, else a year in its title (`date_from` says which). Undated photos stay undated: judge them by what they show
+  (a crane, a missing neighbour, an old car), never assume they are recent.
+- Research when the place last changed (the landmark's completion, a re-cladding, new towers beside it, a rebuilt
+  waterfront) and write the year to `place.json` `refs.since`. Photos older than that are marked `OLD` on the contact
+  sheet and in `--dates`, and newer ones are fetched first.
+- An OLD photo is still good for what did not change (a stone facade's style, the terrain). It is wrong for the
+  skyline round it, for anything rebuilt, and for the target photo if the view has changed.
+- Too few recent photos: search by the neighbour's or the new part's own name (`--query "Dubai Opera"`), which finds
+  what a search for the landmark does not.
 
 ## 2. Dig, then look
 
@@ -242,6 +264,27 @@ photo to full size and write a table in `renders/LOOPS.md`: one row per small th
   scheme as it is on an ordinary night, lit entrances, lamps along the water.
 - **In motion (film and viewer):** whatever moves in the real place and is missing here, as long as it can move
   honestly: fountain jets, boats, lifts, blinking lights. A frozen thing that should move is worse than no thing.
+  Fountain jets registered with `pf.jet(...)` run the same show in the film and on the page.
+
+### What makes a render read as fake (check these before the detail pass)
+
+A scene can have every railing and still look like a model. These five decide it, in this order:
+
+1. **Where the sun is.** The faces the camera sees must be lit from the side, 30 to 70 degrees off the view line.
+   A sun behind the subject gives grey, flat fronts; a sun on the camera's shoulder gives no shape. Pick a real sun
+   position for the place (`pf sun`) that side-lights the delivered views, and check that tall neighbours do not
+   shadow the whole foreground at that elevation.
+2. **Glass that mirrors.** Tower glass is a tinted mirror of the sky and of the towers opposite, each pane a hair
+   out of plane. The engine's curtain walls do this (`region.glass_share`, one tint and band style per tower); a
+   landmark's own glass should too. Grey noise where glass should be is the first thing a viewer rejects.
+3. **A true skyline.** `pf map` fetches every mapped building out to `far_radius_m` and the engine places them at
+   their mapped heights: the towers stand where they stand, the low districts stay low. Check the count in the build
+   log; raise `far_radius_m` (to 6,000 or 8,000) when a delivered view looks toward a skyline.
+4. **Upright verticals.** Give ground-level views `"level": true`: a level camera with the lens shifted, as an
+   architecture photographer shoots. A wide lens tilted up at a tower makes every building lean.
+5. **Air.** Far things fade toward the horizon's colour, not toward a dark wall: `look.haze` with `look.haze_glow`.
+   At night the sky over a city is never black (`look.night_glow`), and lit windows are few, warm and uneven
+   (`look.window_light`).
 
 Render each added detail close up (`views` in `place.json`), then again in the wide view to check it survives the
 distance without flicker. Then look at the same view in the web viewer (`pf web P && pf shot P <view>`): give the table
@@ -306,7 +349,11 @@ Traps and their fixes (slow hosts, OptiX failures, killed jobs, transfers): [ref
 
 - Ground is flat. Hilly sites need terrain; not built yet.
 - Flyovers and tunnels are drawn at grade; only bridges over water get a deck.
-- The far ring is generated, not mapped building by building.
+- The far ring uses every building the map has out to `far_radius_m`, as its smallest enclosing box (towers: their
+  footprint) at the mapped height; where the map gives no height, low ones are guessed from the footprint. Where
+  fewer than `far.mapped_min` (400) are mapped, the ring is generated instead.
+- A coast stretch that stops inside the far radius (a canal bank mapped as coastline) cannot be closed into sea;
+  the engine drops a sea polygon that would cover the pin and says so in the build log.
 - A camera with a tilted horizon or strong lens distortion will not match exactly.
 - Traffic follows lanes at one speed per lane: no junction rules, no overtaking. People walk; they do not stand, sit or cross.
 - One helicopter on a circle (`life.helicopter`, `life.heli_radius`, `life.heli_height`, `life.heli_bearing`, `life.heli_speed`). It flies
