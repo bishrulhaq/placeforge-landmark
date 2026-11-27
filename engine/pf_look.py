@@ -452,4 +452,5 @@ def mat_glass(name="glass", color=(0.10, 0.14, 0.16), mullion=3.0, rough=0.06):
     p = principled(nt, mix(nt, fr, pf.rgba(color), (0.55, 0.56, 0.57, 1)), M(nt, "ADD", rough, M(nt, "MULTIPLY", fr, 0.4)), 0.0, spec=0.9)
     nt.links.new(p.outputs[0], out.inputs[0])
     m.diffuse_color = pf.rgba(color)
+    pf.viewer_facade(m, floor=mullion * 1.2, panel=mullion, sill=0.04, fin=0.02, spandrel=(0.55, 0.56, 0.57), fin_color=(0.55, 0.56, 0.57), vary=0.10)
     return m

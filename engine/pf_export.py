@@ -24,6 +24,8 @@ def mat_info(m, obj_name):
     if not m:
         return d
     d["color"] = [round(c, 4) for c in m.diffuse_color[:3]]
+    if "pf_facade" in m:                # floors and mullions the viewer draws itself (pf.viewer_facade)
+        d["facade"] = {k: (list(v) if hasattr(v, "__len__") else float(v)) for k, v in m["pf_facade"].to_dict().items()}
     nt = m.node_tree
     p = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None) if nt else None
     if p:

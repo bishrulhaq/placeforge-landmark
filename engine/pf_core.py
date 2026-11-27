@@ -341,6 +341,19 @@ def viewer_color(m, color, rough=None, metal=None):
     return m
 
 
+def viewer_facade(m, floor=3.6, panel=1.5, sill=0.27, fin=0.065, spandrel=(0.6, 0.6, 0.6), fin_color=(0.8, 0.8, 0.8),
+                  vary=0.12, lit=0.05, lit_color=(1.0, 0.75, 0.45)):
+    """The floors and mullions of a curtain wall, for the Three.js viewer. A node shader that draws them does not
+    travel; these few numbers do, and the viewer draws the same grid from world position: a spandrel band over the
+    lowest `sill` of every `floor` metres, a fin of half-width `fin` (share of a panel) every `panel` metres, panes
+    that differ by `vary`, and at night a share `lit` of the panes lit in `lit_color`. The material's viewer colour
+    (viewer_color, or its Base Color) is the glass. Give the same numbers as the Cycles shader uses."""
+    m["pf_facade"] = {"floor": float(floor), "panel": float(panel), "sill": float(sill), "fin": float(fin),
+                      "spandrel": [float(c) for c in spandrel[:3]], "fin_color": [float(c) for c in fin_color[:3]],
+                      "vary": float(vary), "lit": float(lit), "lit_color": [float(c) for c in lit_color[:3]]}
+    return m
+
+
 def viewer_emission(m, color, strength=1.0):
     """The light a node-driven material gives off at night in the Three.js viewer (the viewer fades it in after dusk)."""
     m["pf_emit"] = [c * strength for c in color[:3]]

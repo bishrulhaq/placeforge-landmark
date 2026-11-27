@@ -45,6 +45,9 @@ What is generated and what is not:
 8. **Small things decide whether it reads as real.** Once the big shapes match, do a detail pass at every scale:
    list what the photos show that the model does not, and add it. Do this without being asked, and do not call
    the place finished while the list has open rows (see "The detail pass" under the loop).
+9. **Detail must reach every output.** The user opens the web page as readily as the still. A floor line, a window
+   or an arch that exists only in a Cycles node shader is missing from the page: build it as geometry, or hand the
+   viewer its numbers (`pf.viewer_facade`). Check each detail in a Cycles view and in `pf shot` of the same view.
 
 ## 0. Intake: what to ask the user
 
@@ -241,7 +244,11 @@ photo to full size and write a table in `renders/LOOPS.md`: one row per small th
   honestly: fountain jets, boats, lifts, blinking lights. A frozen thing that should move is worse than no thing.
 
 Render each added detail close up (`views` in `place.json`), then again in the wide view to check it survives the
-distance without flicker. A detail smaller than a pixel in every delivered view is not worth its render time: say so
+distance without flicker. Then look at the same view in the web viewer (`pf web P && pf shot P <view>`): give the table
+a column for it. What the viewer lacks is one of two things. Openings, bands, railings and crowns are geometry: build
+them as faces, a hand's breadth proud of the wall, and they are in both outputs. A repeating grid (floors, mullions,
+fins, lit rooms) is `pf.viewer_facade(mat, floor=, panel=, sill=, fin=, spandrel=, fin_color=, lit=)`: the viewer
+draws the same grid from world position, with the numbers the Cycles shader uses. A detail smaller than a pixel in every delivered view is not worth its render time: say so
 in the table and move on.
 
 What to tune and what each knob does: [references/look.md](references/look.md).
@@ -276,8 +283,9 @@ pf shot P photo --t 40        # headless Chrome screenshot (view name, sun eleva
 The page shows the same city and landmark with orbit controls, view buttons and a time-of-day slider, and the same
 life as the film: traffic keeping to its side of the road, parked cars, people walking, trains, the helicopter
 circling with both rotors turning (a "follow helicopter" button rides beside it), head lamps at night. It is a real-time look, not Cycles. Shader detail made
-with nodes does not travel: give such materials an average colour with `pf.viewer_color(...)` (see the landmark
-reference). Vehicle models are thinned to about 1,100 triangles for the page; people are kept whole (a thinned
+with nodes does not travel: give such materials an average colour with `pf.viewer_color(...)`, and their floors and
+mullions with `pf.viewer_facade(...)`; make arches, windows and bands real geometry (see the landmark reference and
+rule 9). Vehicle models are thinned to about 1,100 triangles for the page; people are kept whole (a thinned
 figure falls apart).
 
 ## 9. Where renders run

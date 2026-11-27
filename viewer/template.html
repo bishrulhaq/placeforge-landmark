@@ -353,7 +353,37 @@ function material(info) {
       { vec2 p = vec2(vW.x, -vW.z); float n1 = fbm(vec3(p * 0.08, 1.0)), n2 = fbm(vec3(p * 0.6, 4.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.15, 0.06), smoothstep(0.55, 0.75, n1) * 0.5); diffuseColor.rgb *= 0.8 + 0.35 * n2; }`); };
   if (info.kind === 'glass') { m.roughness = Math.min(info.rough, 0.12); m.envMapIntensity = 1.6; }
+  if (info.facade) facadeShader(m, info.facade);
   return m;
+}
+// A curtain wall drawn from world position (engine: pf.viewer_facade): a spandrel band at every floor, a fin on every
+// mullion, panes that differ a little, lit rooms after dusk. Detail fades to its average where a cell is under two
+// pixels, so a tall tower does not shimmer from far away.
+function facadeShader(m, F) {
+  const f = x => Number(x).toFixed(4), v3 = a => 'vec3(' + a.map(f).join(', ') + ')';
+  m.onBeforeCompile = sh => { worldVaryings(sh, '', 'float fcSpan, fcFin, fcRoom;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      { vec3 nW = normalize(vNw); fcSpan = 0.0; fcFin = 0.0; fcRoom = 0.0;
+        if (abs(nW.y) < 0.5) {
+          vec3 tg = normalize(cross(nW, vec3(0.0, 1.0, 0.0)));
+          float fu = dot(vW, tg) / ${f(F.panel)}, fv = vW.y / ${f(F.floor)};
+          float aU = clamp(1.0 - fwidth(fu) * 1.2, 0.0, 1.0), aV = clamp(1.0 - fwidth(fv) * 1.2, 0.0, 1.0);
+          float wv = fwidth(fv) * 0.7, wu = fwidth(fu) * 0.7;
+          float span = 1.0 - smoothstep(${f(F.sill)} - wv, ${f(F.sill)} + wv, fract(fv));
+          float fin = 1.0 - smoothstep(${f(F.fin)} - wu, ${f(F.fin)} + wu, abs(fract(fu) - 0.5));
+          fcSpan = mix(${f(F.sill)}, span, aV); fcFin = mix(${f(F.fin * 2)}, fin, aU);
+          float cell = hash3(vec3(floor(fu), floor(fv), floor(nW.x * 7.0 + nW.z * 13.0)));
+          diffuseColor.rgb *= 1.0 + (cell - 0.5) * ${f(F.vary * 2)} * aU * aV;
+          diffuseColor.rgb = mix(diffuseColor.rgb, ${v3(F.spandrel)}, fcSpan);
+          diffuseColor.rgb = mix(diffuseColor.rgb, ${v3(F.fin_color)}, fcFin);
+          fcRoom = step(1.0 - ${f(F.lit)}, cell) * (1.0 - fcSpan) * (1.0 - fcFin) * aU * aV + ${f(F.lit)} * (1.0 - aU * aV) * 0.6;
+        } }`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, 0.45, max(fcSpan, fcFin * 0.5));`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        { float nk = max(emissive.r, max(emissive.g, emissive.b));
+          totalEmissiveRadiance = totalEmissiveRadiance * (0.25 + 1.6 * fcFin + 0.3 * fcSpan) + ${v3(F.lit_color)} * fcRoom * nk * 2.5; }`); };
+  m.customProgramCacheKey = () => 'facade' + JSON.stringify(F);
 }
 function buildMeshes(buf) {
   let tris = 0;

@@ -47,6 +47,7 @@ turned to true north at the end (see `TURN` in the Lotus example).
 | `pf.time_value(nt, lambda t: ...)` | A value the film drives each frame (LED shows, beacons) |
 | `pf.viewer_color(mat, colour, rough, metal)` | The average colour a node-driven material shows in the Three.js page |
 | `pf.viewer_emission(mat, colour, strength)` | Its night glow in the Three.js page |
+| `pf.viewer_facade(mat, floor, panel, sill, fin, spandrel, fin_color, vary, lit, lit_color)` | The floors, mullions and lit rooms of a curtain wall in the Three.js page, drawn there from world position. `look.mat_glass` sets it itself |
 
 ## Order of work (each step is a loop: `pf render P --view close`)
 
@@ -59,6 +60,7 @@ turned to true north at the end (see `TURN` in the Lotus example).
 
 Rules that came from real mistakes:
 
+- A detail drawn only in a node shader is absent from the web viewer. Openings and bands: geometry. Grids: `pf.viewer_facade`.
 - Outer layers must be outermost. Draw overlapping shells in the order they are seen.
 - Faceted glass is flat-shaded panels with some metal, not a smooth mirror.
 - Every part meets the ground or another part. Look from below and from above.
