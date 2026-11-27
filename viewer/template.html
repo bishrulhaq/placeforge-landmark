@@ -527,13 +527,13 @@ function buildLife(buf) {
 // fountain jets: the same show as the film (engine/pf_core.py jet_k): a wave along the nozzles, big shooters in bursts
 function buildJets(J) {
   if (!J || !J.length) return 0;
-  const g = new THREE.CylinderGeometry(0.10, 0.34, 1, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.5);
-  const m = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide, fog: true });
+  const g = new THREE.CylinderGeometry(0.04, 0.17, 1, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.5);
+  const m = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, fog: true });
   const im = new THREE.InstancedMesh(g, m, J.length); im.frustumCulled = false; ZUP.add(im);
   const o = new THREE.Object3D();
   tick.push(t => { J.forEach(([x, y, z, h, ph, burst], i) => { let k;
       if (burst) { const c = (t + 2) % 12; k = c < 4 ? Math.pow(Math.sin(Math.PI * c / 4), 0.6) : 0; } else k = 0.30 + 0.70 * Math.abs(Math.sin(0.9 * t - ph));
-      const sz = Math.max(h * k, 0.01), w = 1 + sz * 0.035;
+      const sz = Math.max(h * k, 0.01), w = 1 + sz * 0.03;
       o.position.set(x, y, z); o.scale.set(w, w, sz); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
     im.instanceMatrix.needsUpdate = true; m.color.setRGB(0.95 - 0.35 * nightU.value, 0.97 - 0.42 * nightU.value, 1.0 - 0.55 * nightU.value); });
   return J.length;
