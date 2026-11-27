@@ -64,6 +64,7 @@ Rules that came from real mistakes:
 - Every part meets the ground or another part. Look from below and from above.
 - Anything translucent used as a motion trick (rotor blur) must not cast a shadow.
 - Water in the air (fountain jets, spray) is a volume, not a surface: a white cone reads as a bowling pin. Keep it thin, and
-  dim at night. Leave moving water out of the web viewer unless it moves there too (`pf.arg("export") == "web"`).
+  dim at night. Give it one constant density: a density that varies inside the volume (noise, a fade with height) made
+  every frame four times slower, even with the jets out of shot. Time one frame before and after adding any volume. Leave moving water out of the web viewer unless it moves there too (`pf.arg("export") == "web"`).
 - For recognisable objects on the plot (helicopter, statue, vehicles) find a CC0 or CC-BY model before modelling.
   `pf_life.load_model(path, name, collection, yaw, length=...)` imports a GLB in the engine's axes.
